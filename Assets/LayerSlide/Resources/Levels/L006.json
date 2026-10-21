@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "levelId": "L006",
+  "contentVersion": 1,
+  "ruleVersion": 1,
+  "width": 4,
+  "height": 4,
+  "walls": [],
+  "blocks": [
+    {"id":"A","x":1,"y":1,"width":2,"height":1,"layers":["Red","Blue"]},
+    {"id":"B","x":0,"y":1,"width":1,"height":2,"layers":["Yellow"]}
+  ],
+  "gates": [
+    {"id":"R","side":"Left","start":1,"length":1,"color":"Red"},
+    {"id":"B","side":"Bottom","start":2,"length":2,"color":"Blue"},
+    {"id":"Y","side":"Right","start":0,"length":2,"color":"Yellow"}
+  ],
+  "tutorialTags": ["T06_Park"]
+}

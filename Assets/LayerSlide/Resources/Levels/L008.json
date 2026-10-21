@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "levelId": "L008",
+  "contentVersion": 1,
+  "ruleVersion": 1,
+  "width": 4,
+  "height": 4,
+  "walls": [],
+  "blocks": [
+    {"id":"A","x":1,"y":1,"width":1,"height":1,"layers":["Red","Blue"]},
+    {"id":"B","x":2,"y":2,"width":1,"height":1,"layers":["Red","Yellow"]}
+  ],
+  "gates": [
+    {"id":"R","side":"Left","start":0,"length":4,"color":"Red"},
+    {"id":"B","side":"Bottom","start":1,"length":2,"color":"Blue"},
+    {"id":"Y","side":"Right","start":0,"length":4,"color":"Yellow"}
+  ],
+  "tutorialTags": ["T08_NextColor"]
+}

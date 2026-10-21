@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "levelId": "L010",
+  "contentVersion": 1,
+  "ruleVersion": 1,
+  "width": 4,
+  "height": 4,
+  "walls": [],
+  "blocks": [
+    {"id":"A","x":3,"y":1,"width":1,"height":2,"layers":["Red","Blue"]},
+    {"id":"B","x":1,"y":2,"width":2,"height":1,"layers":["Red","Blue"]},
+    {"id":"C","x":1,"y":1,"width":2,"height":1,"layers":["Red","Blue"]},
+    {"id":"D","x":0,"y":0,"width":1,"height":1,"layers":["Red"]}
+  ],
+  "gates": [
+    {"id":"R","side":"Left","start":1,"length":3,"color":"Red"},
+    {"id":"B","side":"Bottom","start":1,"length":3,"color":"Blue"},
+    {"id":"Y","side":"Right","start":0,"length":3,"color":"Yellow"}
+  ],
+  "tutorialTags": []
+}

@@ -1,0 +1,23 @@
+{
+    "name": "LayerSlide.Editor",
+    "rootNamespace": "LayerSlide.Editor",
+    "references": [
+        "LayerSlide.Core",
+        "LayerSlide.Runtime",
+        "Unity.TextMeshPro",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

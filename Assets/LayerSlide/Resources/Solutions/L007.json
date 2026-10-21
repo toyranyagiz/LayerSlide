@@ -1,0 +1,9 @@
+{
+  "levelId":"L007","contentVersion":1,"ruleVersion":1,
+  "actions":[
+    {"block":"B","x":0,"y":0,"exit":"R"},
+    {"block":"A","x":1,"y":0,"exit":""},
+    {"block":"A","x":2,"y":0,"exit":""},
+    {"block":"A","x":2,"y":0,"exit":"B"}
+  ]
+}

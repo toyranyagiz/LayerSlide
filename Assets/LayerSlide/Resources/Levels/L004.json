@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "levelId": "L004",
+  "contentVersion": 1,
+  "ruleVersion": 1,
+  "width": 4,
+  "height": 4,
+  "walls": [],
+  "blocks": [
+    {"id":"A","x":1,"y":1,"width":1,"height":1,"layers":["Red","Blue"]}
+  ],
+  "gates": [
+    {"id":"R","side":"Left","start":1,"length":1,"color":"Red"},
+    {"id":"B","side":"Bottom","start":2,"length":1,"color":"Blue"}
+  ],
+  "tutorialTags": ["T04_Axis"]
+}

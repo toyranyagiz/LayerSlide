@@ -1,0 +1,23 @@
+{
+  "levelId":"L009","contentVersion":1,"ruleVersion":1,
+  "actions":[
+    {"block":"A","x":3,"y":0,"exit":"Y"},
+    {"block":"A","x":1,"y":0,"exit":""},
+    {"block":"B","x":2,"y":0,"exit":"B"},
+    {"block":"A","x":1,"y":1,"exit":""},
+    {"block":"A","x":0,"y":1,"exit":"R"},
+    {"block":"C","x":0,"y":1,"exit":""},
+    {"block":"B","x":1,"y":0,"exit":""},
+    {"block":"C","x":1,"y":1,"exit":""},
+    {"block":"D","x":0,"y":1,"exit":""},
+    {"block":"D","x":0,"y":1,"exit":"R"},
+    {"block":"B","x":0,"y":0,"exit":""},
+    {"block":"C","x":2,"y":1,"exit":""},
+    {"block":"C","x":2,"y":0,"exit":"B"},
+    {"block":"B","x":0,"y":1,"exit":""},
+    {"block":"B","x":0,"y":1,"exit":"R"},
+    {"block":"C","x":0,"y":0,"exit":""},
+    {"block":"C","x":0,"y":1,"exit":""},
+    {"block":"C","x":0,"y":1,"exit":"R"}
+  ]
+}
