@@ -7,13 +7,29 @@ namespace LayerSlide.Services
     /// <summary>Ordered list of shipped levels and loader for their embedded JSON (Resources/Levels, Resources/Solutions).</summary>
     public static class LevelCatalog
     {
-        static readonly string[] Ids = { "L001", "L002", "L003", "L004", "L005", "L006", "L007", "L008", "L009", "L010" };
+        /// <summary>Campaign 2 (GDD v2.0): L001–L030 redesigned, L031–L040 new.</summary>
+        public const int CampaignVersion = RuleConstants.CampaignVersion;
+
+        static readonly string[] Ids = BuildIds(40);
 
         static readonly string[] Titles =
         {
-            "İlk sürükleme", "Renk eşleştirme", "İkinci katman", "Eksen değişimi", "Önce alan aç",
-            "Geçici taşıma", "Kapı genişliği", "Alt renkleri oku", "Dönüş güzergâhı", "İlk birleşim"
+            "Anahtar için yol aç", "İki yön, iki katman", "İlk sıkışma", "Yan yol", "Duvarın çevresi",
+            "Dar çıkış", "Yer değiştir", "Geri dönüş", "İki anahtar", "Kilit zinciri",
+            "Kapıya hazırlık", "Alan takası", "Bir adım sonrası", "Yolu açık tut", "Ray ve kilit sınavı",
+            "Plakayı tut", "Tutucu seçimi", "Plakaya giden yol", "Anahtar ve tutucu", "Yer aç, basılı tut",
+            "Sıralı çözülme", "Kapıyı açık bırak", "Son tutucu", "İki plaka", "Çifte nöbet",
+            "Dar park alanı", "İki tutuculu zincir", "Yeri devret", "Kilitli geçiş", "Üç mekanik sınavı",
+            "Kapının ikinci rengi", "Fazı hazırla", "Dört koşul", "Tutucu ve renk sırası", "Doğru anda soy",
+            "Renk sırasını koru", "Kapı ritmi", "Son hamleyi sakla", "Bütün bağlantılar", "Usta planı"
         };
+
+        static string[] BuildIds(int count)
+        {
+            var ids = new string[count];
+            for (int i = 0; i < count; i++) ids[i] = "L" + (i + 1).ToString("000");
+            return ids;
+        }
 
         static readonly Dictionary<string, Level> LevelCache = new Dictionary<string, Level>();
         static readonly Dictionary<string, SolutionRecord> SolutionCache = new Dictionary<string, SolutionRecord>();

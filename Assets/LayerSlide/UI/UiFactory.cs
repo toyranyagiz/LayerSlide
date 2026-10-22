@@ -1,4 +1,5 @@
 using System;
+using LayerSlide.Presentation;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -6,23 +7,59 @@ using UnityEngine.UI;
 
 namespace LayerSlide.UI
 {
+    public enum TextStyle
+    {
+        /// <summary>Body font, plain.</summary>
+        Body,
+        /// <summary>Display font, plain.</summary>
+        Display,
+        /// <summary>Display font with a thick outline and drop shadow, for titles on the sky background.</summary>
+        Title,
+        /// <summary>Display font with a soft drop shadow, for button labels.</summary>
+        Button
+    }
+
+    public enum ButtonLayout
+    {
+        LabelOnly,
+        IconOnly,
+        IconLeft,
+        IconTop
+    }
+
     /// <summary>Small helpers for building uGUI hierarchies from code. All sizes are in dp (1 canvas unit = 1 dp).</summary>
     public sealed class UiFactory
     {
-        public const float ButtonHeight = 56f;
-        public const float FontTitle = 20f;
-        public const float FontBody = 16f;
-        public const float FontButton = 17f;
-        public const float FontSmall = 14f;
+        public const float ButtonHeight = 60f;
+        public const float LipHeight = 6f;
+        public const float FontHero = 52f;
+        public const float FontTitle = 30f;
+        public const float FontHeader = 26f;
+        public const float FontButton = 22f;
+        public const float FontBody = 18f;
+        public const float FontSmall = 15f;
 
-        public readonly TMP_FontAsset Regular;
-        public readonly TMP_FontAsset SemiBold;
+        public static readonly ButtonColors Green = new ButtonColors(Palette.Green, Palette.GreenLip, Color.white);
+        public static readonly ButtonColors Orange = new ButtonColors(Palette.Orange, Palette.OrangeLip, Color.white);
+        public static readonly ButtonColors Sky = new ButtonColors(Palette.Sky, Palette.SkyLip, Color.white);
+        public static readonly ButtonColors Pink = new ButtonColors(Palette.Pink, Palette.PinkLip, Color.white);
+        public static readonly ButtonColors White = new ButtonColors(Palette.Panel, Palette.PanelLip, Palette.Text);
+        public static readonly ButtonColors Locked = new ButtonColors(Palette.Locked, Palette.LockedLip, Color.white);
 
-        public UiFactory(TMP_FontAsset regular, TMP_FontAsset semiBold)
+        public readonly TMP_FontAsset Body;
+        public readonly TMP_FontAsset Display;
+        readonly Material _titleMaterial;
+        readonly Material _buttonMaterial;
+
+        public UiFactory(VisualTheme theme)
         {
-            Regular = regular;
-            SemiBold = semiBold;
+            Body = theme.bodyFont;
+            Display = theme.displayFont;
+            _titleMaterial = theme.titleTextMaterial;
+            _buttonMaterial = theme.buttonTextMaterial;
         }
+
+        // ---------------------------------------------------------------- Rects
 
         public static RectTransform CreateRect(string name, Transform parent)
         {
@@ -72,70 +109,182 @@ namespace LayerSlide.UI
             rect.sizeDelta = size;
         }
 
-        public Image Panel(string name, Transform parent, Color color, bool rounded, bool raycast = false)
+        // ---------------------------------------------------------------- Graphics
+
+        /// <param name="radius">Corner radius in dp; 0 gives a plain rectangle.</param>
+        public Image Panel(string name, Transform parent, Color color, float radius, bool raycast = false)
         {
             var image = CreateRect(name, parent).gameObject.AddComponent<Image>();
             image.color = color;
             image.raycastTarget = raycast;
-            if (rounded)
-            {
-                image.sprite = SpriteFactory.RoundedRect;
-                image.type = Image.Type.Sliced;
-            }
+            if (radius > 0f) MakeRounded(image, radius);
             return image;
         }
 
-        public TextMeshProUGUI Text(string name, Transform parent, string text, float size, bool semiBold, Color color,
+        public static void MakeRounded(Image image, float radius)
+        {
+            image.sprite = SpriteFactory.RoundedRect;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = SpriteFactory.RadiusMultiplier(radius);
+        }
+
+        /// <summary>Soft drop shadow behind <paramref name="parent"/>'s rect, offset downwards.</summary>
+        public static Image DropShadow(Transform parent, float spread, float offsetY, float alpha = 1f)
+        {
+            var image = CreateRect("Shadow", parent).gameObject.AddComponent<Image>();
+            image.sprite = SpriteFactory.SoftShadow;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1.4f;
+            var color = Palette.Shadow;
+            color.a *= alpha;
+            image.color = color;
+            image.raycastTarget = false;
+            Stretch(image.rectTransform, -spread, -spread, -spread + offsetY, -spread - offsetY);
+            image.transform.SetAsFirstSibling();
+            IgnoreLayout(image);
+            return image;
+        }
+
+        public static Image Icon(Transform parent, Sprite sprite, Color color, float size)
+        {
+            var image = CreateRect("Icon", parent).gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = false;
+            image.preserveAspect = true;
+            Fixed(image.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
+            return image;
+        }
+
+        /// <summary>
+        /// White rounded card with a lavender lip and soft shadow. Children go into the returned face rect; give it
+        /// a layout group and the card (the face's parent) grows to fit it.
+        /// </summary>
+        public RectTransform Card(string name, Transform parent, float radius = 26f, Color? face = null)
+        {
+            var root = CreateRect(name, parent);
+            VerticalLayout(root.gameObject, 0f, new RectOffset(0, 0, 0, (int)LipHeight + 2));
+            DropShadow(root, 10f, 8f);
+            var lip = Panel("Lip", root, Palette.PanelLip, radius, raycast: true);
+            Stretch(lip.rectTransform);
+            IgnoreLayout(lip);
+            var body = Panel("Face", root, face ?? Palette.Panel, radius, raycast: true);
+            return body.rectTransform;
+        }
+
+        public static void IgnoreLayout(Component component)
+        {
+            if (!component.TryGetComponent(out LayoutElement element))
+                element = component.gameObject.AddComponent<LayoutElement>();
+            element.ignoreLayout = true;
+        }
+
+        // ---------------------------------------------------------------- Text
+
+        public TextMeshProUGUI Text(string name, Transform parent, string text, float size, TextStyle style, Color color,
             TextAlignmentOptions alignment = TextAlignmentOptions.Center)
         {
             var label = CreateRect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
-            label.font = semiBold ? SemiBold : Regular;
+            label.font = style == TextStyle.Body ? Body : Display;
+            if (style == TextStyle.Title && _titleMaterial != null) label.fontSharedMaterial = _titleMaterial;
+            else if (style == TextStyle.Button && _buttonMaterial != null) label.fontSharedMaterial = _buttonMaterial;
             label.fontSize = size;
             label.enableAutoSizing = false;
             label.color = color;
             label.alignment = alignment;
             label.textWrappingMode = TextWrappingModes.Normal;
             label.overflowMode = TextOverflowModes.Overflow;
-            label.lineSpacing = 0f;
+            label.lineSpacing = -8f;
             label.raycastTarget = false;
             label.text = text;
             return label;
         }
 
-        public Button Button(string name, Transform parent, string label, Color background, Color textColor, UnityAction onClick,
-            out TextMeshProUGUI text)
-        {
-            var image = Panel(name, parent, background, rounded: true, raycast: true);
-            var button = image.gameObject.AddComponent<Button>();
-            var colors = button.colors;
-            colors.highlightedColor = Color.white;
-            colors.pressedColor = new Color(0.85f, 0.88f, 0.92f, 1f);
-            colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
-            colors.fadeDuration = 0.05f;
-            button.colors = colors;
-            button.targetGraphic = image;
-            if (onClick != null) button.onClick.AddListener(onClick);
+        // ---------------------------------------------------------------- Buttons
 
-            text = Text("Label", image.transform, label, FontButton, true, textColor);
-            Stretch(text.rectTransform, 8f, 8f, 0f, 0f);
-            return button;
-        }
-
-        public Button IconButton(string name, Transform parent, Sprite icon, Color iconColor, UnityAction onClick, out Image iconImage)
+        /// <summary>
+        /// Chunky button: shadow, lip, face (with gloss) and its content. <paramref name="icon"/> may be null for
+        /// <see cref="ButtonLayout.LabelOnly"/>.
+        /// </summary>
+        public ChunkyButton Button(string name, Transform parent, string label, ButtonColors colors, UnityAction onClick,
+            Sprite icon = null, ButtonLayout layout = ButtonLayout.LabelOnly, float radius = 20f, float fontSize = FontButton, float iconSize = 28f)
         {
-            // Transparent 48x48 hit target with a 28 dp icon.
-            var hit = Panel(name, parent, new Color(1f, 1f, 1f, 0f), rounded: false, raycast: true);
-            var button = hit.gameObject.AddComponent<Button>();
+            var root = CreateRect(name, parent);
+            DropShadow(root, 6f, 5f, 0.8f);
+
+            var lip = Panel("Lip", root, colors.Lip, radius);
+            Stretch(lip.rectTransform);
+
+            // The face is the raycast target and the Button's graphic.
+            var face = Panel("Face", root, colors.Face, radius, raycast: true);
+            Stretch(face.rectTransform);
+
+            var gloss = Panel("Gloss", face.transform, new Color(1f, 1f, 1f, 0.22f), radius * 0.8f);
+            var glossRect = gloss.rectTransform;
+            glossRect.anchorMin = new Vector2(0f, 0.52f);
+            glossRect.anchorMax = new Vector2(1f, 1f);
+            glossRect.offsetMin = new Vector2(6f, 0f);
+            glossRect.offsetMax = new Vector2(-6f, -4f);
+
+            var content = Stretch(CreateRect("Content", face.transform), 8f, 8f, 2f, 2f);
+
+            var button = root.gameObject.AddComponent<Button>();
             button.transition = Selectable.Transition.None;
+            button.targetGraphic = face;
             if (onClick != null) button.onClick.AddListener(onClick);
 
-            iconImage = CreateRect("Icon", hit.transform).gameObject.AddComponent<Image>();
-            iconImage.sprite = icon;
-            iconImage.color = iconColor;
-            iconImage.raycastTarget = false;
-            Fixed(iconImage.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(28f, 28f));
+            var chunky = root.gameObject.AddComponent<ChunkyButton>();
+            chunky.Setup(button, face, lip, gloss, content, LipHeight);
+
+            if (layout != ButtonLayout.LabelOnly && icon != null)
+            {
+                var image = Icon(content, icon, colors.Content, iconSize);
+                chunky.SetIcon(image);
+                if (layout == ButtonLayout.IconTop)
+                {
+                    Fixed(image.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(iconSize, iconSize));
+                }
+                else if (layout == ButtonLayout.IconLeft)
+                {
+                    var element = image.gameObject.AddComponent<LayoutElement>();
+                    element.preferredWidth = element.preferredHeight = iconSize;
+                }
+            }
+
+            if (layout != ButtonLayout.IconOnly)
+            {
+                var text = Text("Label", content, label, fontSize, TextStyle.Button, colors.Content);
+                text.textWrappingMode = TextWrappingModes.NoWrap;
+                chunky.SetLabel(text);
+                if (layout == ButtonLayout.IconTop)
+                    BottomStrip(text.rectTransform, 0f, fontSize + 6f);
+                else if (layout != ButtonLayout.IconLeft)
+                    Stretch(text.rectTransform);
+            }
+
+            if (layout == ButtonLayout.IconLeft)
+            {
+                var row = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+                row.childAlignment = TextAnchor.MiddleCenter;
+                row.spacing = 10f;
+                row.childControlWidth = row.childControlHeight = true;
+                row.childForceExpandWidth = row.childForceExpandHeight = false;
+            }
+
+            return chunky;
+        }
+
+        /// <summary>Square chunky button with a centered icon (round when <paramref name="radius"/> is half the size).</summary>
+        public ChunkyButton IconButton(string name, Transform parent, Sprite icon, ButtonColors colors, UnityAction onClick, float size = 52f,
+            float iconSize = 28f, float radius = 18f)
+        {
+            var button = Button(name, parent, null, colors, onClick, icon, ButtonLayout.IconOnly, radius, iconSize: iconSize);
+            ((RectTransform)button.transform).sizeDelta = new Vector2(size, size);
+            button.Icon.rectTransform.anchoredPosition = new Vector2(0f, 1f);
             return button;
         }
+
+        // ---------------------------------------------------------------- Layout
 
         public static VerticalLayoutGroup VerticalLayout(GameObject go, float spacing, RectOffset padding, TextAnchor alignment = TextAnchor.UpperCenter)
         {
@@ -179,20 +328,9 @@ namespace LayerSlide.UI
             scroll.content = content;
             scroll.viewport = viewport;
             scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
             scroll.scrollSensitivity = 20f;
             return content;
-        }
-
-        public static void SetInteractable(Button button, bool interactable, TextMeshProUGUI label = null)
-        {
-            button.interactable = interactable;
-            if (label != null)
-            {
-                var color = label.color;
-                color.a = interactable ? 1f : 0.45f;
-                label.color = color;
-            }
         }
 
         public static void ClearChildren(Transform parent)
@@ -201,7 +339,7 @@ namespace LayerSlide.UI
                 UnityEngine.Object.Destroy(parent.GetChild(i).gameObject);
         }
 
-        public static void Bind(Button button, Action action)
+        public static void Bind(UnityEngine.UI.Button button, Action action)
         {
             button.onClick.RemoveAllListeners();
             if (action != null) button.onClick.AddListener(() => action());

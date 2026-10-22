@@ -24,6 +24,56 @@ namespace LayerSlide.Editor
         const string MixerPath = AudioFolder + "/LayerSlide.mixer";
         const string LibraryPath = Root + "/Resources/Audio/SfxLibrary.asset";
         public const string IconPath = Root + "/Art/Icon.png";
+        public const string SkyGradientPath = Root + "/Art/SkyGradient.png";
+        public const string BlobShadowPath = Root + "/Art/BlobShadow.png";
+
+        // ---------------------------------------------------------------- Background textures
+
+        /// <summary>Sky gradient for the board background and the soft blob shadow drawn under blocks.</summary>
+        public static void BakeBackgroundTextures()
+        {
+            const int height = 256;
+            var sky = new Color32[4 * height];
+            for (int y = 0; y < height; y++)
+            {
+                float t = y / (height - 1f);
+                Color32 color = Color.Lerp(Palette.SkyBottom, Palette.SkyTop, t * t * (3f - 2f * t));
+                for (int x = 0; x < 4; x++) sky[y * 4 + x] = color;
+            }
+            WriteTexture(SkyGradientPath, 4, height, sky);
+
+            const int size = 128;
+            var blob = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                // Rounded square falloff so the shadow follows rectangular blocks.
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                float d = RoundedBox(p, new Vector2(64, 64), new Vector2(34, 34), 18f);
+                float a = Mathf.Clamp01(1f - (d + 6f) / 26f);
+                blob[y * size + x] = new Color32(255, 255, 255, (byte)(a * a * (3f - 2f * a) * 255f));
+            }
+            WriteTexture(BlobShadowPath, size, size, blob);
+        }
+
+        static void WriteTexture(string path, int width, int height, Color32[] pixels)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Default;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
 
         // ---------------------------------------------------------------- Meshes
 
@@ -37,27 +87,39 @@ namespace LayerSlide.Editor
             {
                 foreach (var (w, h) in new[] { (1, 1), (2, 1), (1, 2) })
                 {
-                    MeshLibrary.RoundedSlab(w - 0.08f, BlockView.LayerHeight, h - 0.08f);
+                    MeshLibrary.RoundedSlab(w - 0.08f, BlockView.LayerHeight, h - 0.08f, 0.16f);
+                    MeshLibrary.Quad(w + 0.34f, h + 0.34f);
+                    MeshLibrary.RoundedSlab(w - 0.08f - 0.24f, 0.002f, 0.12f, 0.06f);
                     MeshLibrary.Frame(w, h, 0.03f);
                     MeshLibrary.Frame(w + 0.08f, h + 0.08f, 0.05f);
                 }
-                MeshLibrary.Box(0.96f, 0.04f, 0.96f);
-                MeshLibrary.Box(0.96f, 0.24f, 0.96f);
+                // Board pieces: cells, walls, tray and base for boards from 3x3 to 6x6.
+                MeshLibrary.RoundedSlab(0.94f, 0.06f, 0.94f, 0.14f);
+                MeshLibrary.RoundedSlab(0.92f, 0.26f, 0.92f, 0.16f);
+                for (int bw = 3; bw <= 6; bw++)
+                for (int bh = 3; bh <= 6; bh++)
+                {
+                    MeshLibrary.RoundedSlab(bw + 0.88f, 0.30f, bh + 0.88f, 0.40f);
+                    MeshLibrary.RoundedSlab(bw + 1.08f, 0.30f, bh + 1.08f, 0.50f);
+                }
                 MeshLibrary.Box(1f, 0.20f, 1f);
-                MeshLibrary.Box(0.04f, 0.04f, 0.04f);
+                MeshLibrary.Box(0.07f, 0.07f, 0.07f);
+                MeshLibrary.Box(0.12f, 0.012f, 0.07f);
                 MeshLibrary.Box(1f, GateView.SurfaceHeight + 0.006f, 1f);
                 for (int length = 1; length <= 5; length++)
                 {
-                    MeshLibrary.Box(GateView.Depth, GateView.SurfaceHeight, length);
-                    MeshLibrary.Box(length, GateView.SurfaceHeight, GateView.Depth);
+                    MeshLibrary.RoundedSlab(GateView.Depth - 0.04f, GateView.SurfaceHeight, length - 0.04f, 0.10f);
+                    MeshLibrary.RoundedSlab(length - 0.04f, GateView.SurfaceHeight, GateView.Depth - 0.04f, 0.10f);
                     MeshLibrary.Frame(GateView.Depth + 0.06f, length + 0.06f, 0.04f);
                     MeshLibrary.Frame(length + 0.06f, GateView.Depth + 0.06f, 0.04f);
                 }
                 MeshLibrary.Frame(1f, 1f, 0.03f);
                 MeshLibrary.Frame(1f, 1f, 0.05f);
-                MeshLibrary.Cross(0.3f, 0.05f);
+                MeshLibrary.Cross(0.3f, 0.06f);
                 foreach (LayerColor color in Enum.GetValues(typeof(LayerColor)))
                 {
+                    MeshLibrary.Symbol(color, 0.24f);
+                    MeshLibrary.Symbol(color, 0.20f);
                     MeshLibrary.Symbol(color, 0.22f);
                     MeshLibrary.Symbol(color, 0.185f);
                 }
@@ -108,8 +170,17 @@ namespace LayerSlide.Editor
             var clips = new AudioClip[7];
             for (int i = 0; i < clips.Length; i++)
             {
-                string path = $"{AudioFolder}/{SfxSynth.FileNames[i]}.wav";
-                WriteWav(path, SfxSynth.Generate((Sfx)i), SfxSynth.SampleRate);
+                // Recorded effects (Kenney, CC0; see Audio/Kenney-CC0.txt) win; synthesis covers anything missing.
+                string path = $"{AudioFolder}/{SfxSynth.FileNames[i]}.ogg";
+                if (!File.Exists(path))
+                {
+                    path = $"{AudioFolder}/{SfxSynth.FileNames[i]}.wav";
+                    WriteWav(path, SfxSynth.Generate((Sfx)i), SfxSynth.SampleRate);
+                }
+                else
+                {
+                    AssetDatabase.DeleteAsset($"{AudioFolder}/{SfxSynth.FileNames[i]}.wav");
+                }
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
 
                 var importer = (AudioImporter)AssetImporter.GetAtPath(path);
@@ -195,29 +266,34 @@ namespace LayerSlide.Editor
         // ---------------------------------------------------------------- Icon and splash
 
         /// <summary>
-        /// 512x512 icon: one block with a red top layer over a blue lower layer on navy, no text (GDD 04 §11).
-        /// Also used as the splash logo shown on the same navy background.
+        /// 512x512 icon: a glossy two-layer block (red over blue) on the sky gradient, no text (GDD 04 §11).
+        /// Also used as the splash logo.
         /// </summary>
         public static void BakeIconAndSplash()
         {
             const int size = 512;
             var pixels = new Color32[size * size];
-            Color navy = Palette.Environment, red = Palette.Red, blue = Palette.Blue;
-            Color blueSide = blue * 0.78f, redSide = red * 0.80f;
-            blueSide.a = redSide.a = 1f;
+            Color red = Palette.Red, blue = Palette.Blue;
+            Color blueSide = Palette.Darken(blue, 0.22f), redSide = Palette.Darken(red, 0.22f);
+            var shadow = new Color(0.12f, 0.05f, 0.35f, 1f);
+            var gloss = new Color(1f, 1f, 1f, 1f);
 
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
             {
                 var p = new Vector2(x + 0.5f, y + 0.5f);
-                Color color = navy;
-                // Layers drawn bottom-up: lower layer front face, lower top, upper front face, upper top, symbol.
-                color = Over(color, blueSide, Coverage(RoundedBox(p, new Vector2(256, 176), new Vector2(150, 44), 34)));
-                color = Over(color, blue, Coverage(RoundedBox(p, new Vector2(256, 212), new Vector2(150, 92), 34)));
-                color = Over(color, redSide, Coverage(RoundedBox(p, new Vector2(256, 250), new Vector2(150, 44), 34)));
-                color = Over(color, red, Coverage(RoundedBox(p, new Vector2(256, 300), new Vector2(150, 92), 34)));
-                color = Over(color, Palette.Text, Coverage(Vector2.Distance(p, new Vector2(256, 300)) - 40f));
-                color = Over(color, Color.white, Coverage(Vector2.Distance(p, new Vector2(256, 300)) - 33f));
+                float t = y / (size - 1f);
+                Color color = Color.Lerp(Palette.SkyBottom, Palette.SkyTop, t * t * (3f - 2f * t));
+                // Soft contact shadow, then layers bottom-up: side, top, gloss band, symbol.
+                float shadowDistance = RoundedBox(p, new Vector2(256, 140), new Vector2(150, 40), 40);
+                color = Over(color, shadow, 0.35f * Mathf.Clamp01(1f - (shadowDistance + 10f) / 40f));
+                color = Over(color, blueSide, Coverage(RoundedBox(p, new Vector2(256, 176), new Vector2(156, 48), 44)));
+                color = Over(color, blue, Coverage(RoundedBox(p, new Vector2(256, 214), new Vector2(156, 88), 44)));
+                color = Over(color, gloss, 0.25f * Coverage(RoundedBox(p, new Vector2(256, 262), new Vector2(122, 22), 22)));
+                color = Over(color, redSide, Coverage(RoundedBox(p, new Vector2(256, 256), new Vector2(156, 48), 44)));
+                color = Over(color, red, Coverage(RoundedBox(p, new Vector2(256, 306), new Vector2(156, 88), 44)));
+                color = Over(color, gloss, 0.30f * Coverage(RoundedBox(p, new Vector2(256, 360), new Vector2(122, 22), 22)));
+                color = Over(color, Color.white, Coverage(Vector2.Distance(p, new Vector2(256, 300)) - 38f));
                 pixels[y * size + x] = color;
             }
 
@@ -239,7 +315,7 @@ namespace LayerSlide.Editor
             PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
 
             var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(IconPath);
-            PlayerSettings.SplashScreen.backgroundColor = Palette.Environment;
+            PlayerSettings.SplashScreen.backgroundColor = Palette.SkyBottom;
             PlayerSettings.SplashScreen.unityLogoStyle = PlayerSettings.SplashScreen.UnityLogoStyle.LightOnDark;
             PlayerSettings.SplashScreen.drawMode = PlayerSettings.SplashScreen.DrawMode.AllSequential;
             PlayerSettings.SplashScreen.logos = new[] { PlayerSettings.SplashScreenLogo.Create(1.5f, sprite) };

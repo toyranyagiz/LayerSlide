@@ -1,9 +1,85 @@
 {
-  "levelId":"L005","contentVersion":1,"ruleVersion":1,
-  "actions":[
-    {"block":"B","x":0,"y":0,"exit":"Y"},
-    {"block":"A","x":0,"y":1,"exit":"R"},
-    {"block":"A","x":2,"y":1,"exit":""},
-    {"block":"A","x":2,"y":0,"exit":"B"}
+  "levelId": "L005",
+  "contentVersion": 2,
+  "ruleVersion": 2,
+  "actions": [
+    {
+      "block": "A",
+      "x": 0,
+      "y": 0,
+      "exit": "R"
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 3,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 0,
+      "exit": "B"
+    },
+    {
+      "block": "C",
+      "x": 2,
+      "y": 2,
+      "exit": "Y"
+    },
+    {
+      "block": "C",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 3,
+      "exit": "T"
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 0,
+      "exit": "B"
+    }
   ]
 }

@@ -137,6 +137,27 @@ namespace LayerSlide.Tests
             yield return WaitIdle();
         }
 
+        /// <summary>
+        /// Commits every recorded L001 action but the last directly (as the touch path would), leaving the final
+        /// slide-and-peel of C from x=3 through the left red gate, which wins the level.
+        /// </summary>
+        IEnumerator PlayL001UntilTheLastPeel()
+        {
+            var actions = LevelCatalog.LoadSolution("L001").actions;
+            var level = _game.Board.Level;
+            for (int i = 0; i < actions.Count - 1; i++)
+            {
+                var action = actions[i];
+                int block = level.IndexOfBlock(action.block);
+                yield return WaitIdle();
+                _game.OnBlockPressed(block);
+                _game.OnBlockReleased(block, action.x, action.y, string.IsNullOrEmpty(action.exit) ? -1 : level.IndexOfGate(action.exit));
+            }
+            yield return WaitIdle();
+        }
+
+        int LastPeelBlock => _game.Board.Level.IndexOfBlock("C");
+
         IEnumerator PlayLevel(string levelId)
         {
             Assert.AreEqual(levelId, _game.Board.Level.LevelId);
@@ -186,8 +207,11 @@ namespace LayerSlide.Tests
         public IEnumerator X02_DragEndingOverTheHudOnlyCommitsTheBoardMove()
         {
             yield return LoadGameplay();
+            yield return PlayL001UntilTheLastPeel();
             var board = _game.Board;
-            var center = _presenter.BlockCenter(0, board.GetX(0), board.GetY(0));
+            int moves = board.MoveCount;
+            int c = LastPeelBlock;
+            var center = _presenter.BlockCenter(c, board.GetX(c), board.GetY(c));
             Vector2 start = ScreenOf(center + Vector3.up * 0.2f);
             var hit = PlaneHit(_camera.ScreenPointToRay(start));
 
@@ -203,7 +227,7 @@ namespace LayerSlide.Tests
             EndTouch(20, overUndo);
             yield return null;
             yield return WaitFor(() => _ui.Modal.Current == ModalId.Won);
-            Assert.AreEqual(1, board.MoveCount, "the HUD button under the finger did not run");
+            Assert.AreEqual(moves + 1, board.MoveCount, "the HUD button under the finger did not run");
         }
 
         [UnityTest]
@@ -211,13 +235,14 @@ namespace LayerSlide.Tests
         {
             yield return LoadGameplay();
             var board = _game.Board;
+            int startX = board.GetX(0);
             yield return Drag(0, Vector3.left * 0.7f, release: false);
             _game.SendMessage("OnApplicationFocus", false);
             EndTouch(_nextTouchId - 1, ScreenOf(_presenter.CellCenter(0, 1))); // up arrives in the same frame
             yield return null;
             yield return null;
             Assert.AreEqual(0, board.MoveCount);
-            Assert.AreEqual(1, board.GetX(0), "the hold start is kept");
+            Assert.AreEqual(startX, board.GetX(0), "the hold start is kept");
 
             _game.SendMessage("OnApplicationFocus", true);
             yield return null;
@@ -228,9 +253,10 @@ namespace LayerSlide.Tests
         public IEnumerator R13_WinIsRecordedOnceEvenWithRepeatedCallbacks()
         {
             yield return LoadGameplay();
+            yield return PlayL001UntilTheLastPeel();
             int wins = 0;
             _game.LevelCompleted += _ => wins++;
-            yield return Drag(0, Vector3.left * 1.5f);
+            yield return Drag(LastPeelBlock, Vector3.left * (_game.Board.GetX(LastPeelBlock) + 0.7f));
             _game.SendMessage("OnApplicationFocus", false); // during Resolving: jumps to the final state
             _game.SendMessage("OnApplicationFocus", false);
             _game.SendMessage("OnApplicationFocus", true);
@@ -270,7 +296,8 @@ namespace LayerSlide.Tests
         public IEnumerator S04_ClosingDuringTheLastPeelKeepsTheWin()
         {
             yield return LoadGameplay();
-            yield return Drag(0, Vector3.left * 1.5f);
+            yield return PlayL001UntilTheLastPeel();
+            yield return Drag(LastPeelBlock, Vector3.left * (_game.Board.GetX(LastPeelBlock) + 0.7f));
             yield return LoadGameplay(); // killed while Resolving
             CollectionAssert.AreEqual(new[] { "L001" }, ReadSave().completedLevelIds);
         }
@@ -286,7 +313,8 @@ namespace LayerSlide.Tests
 
             foreach (var tamper in new System.Action<PlayerSave>[]
                      {
-                         save => save.currentRun.boardState.contentVersion = 2,   // S08
+                         save => save.currentRun.boardState.contentVersion = 99,  // S08
+
                          save => save.currentRun.history[0].afterX = 3            // S09
                      })
             {

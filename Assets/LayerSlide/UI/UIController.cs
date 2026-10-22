@@ -53,11 +53,9 @@ namespace LayerSlide.UI
             if (!TryGetComponent(out _raycaster)) _raycaster = gameObject.AddComponent<GraphicRaycaster>();
             EnsureEventSystem();
 
-            var ui = new UiFactory(theme.regularFont, theme.semiBoldFont);
+            var ui = new UiFactory(theme);
 
-            var backdrop = ui.Panel("Backdrop", transform, Palette.Environment, rounded: false);
-            UiFactory.Stretch(backdrop.rectTransform);
-            _backdrop = backdrop.gameObject;
+            _backdrop = BuildBackdrop(ui);
 
             _safeRoot = UiFactory.CreateRect("SafeArea", transform);
             Hud = new HudView(ui, _safeRoot, handler);
@@ -70,6 +68,58 @@ namespace LayerSlide.UI
 
             ApplyLayout();
             ShowScreen(AppScreen.Home);
+        }
+
+        /// <summary>Mirrors the reduced-motion setting into UI animations (pop-ins, bobbing, button bounce).</summary>
+        public bool ReducedMotion
+        {
+            get => UiAnim.Reduced;
+            set => UiAnim.Reduced = value;
+        }
+
+        /// <summary>Menu background: the sky gradient with a few soft floating shapes.</summary>
+        GameObject BuildBackdrop(UiFactory ui)
+        {
+            var backdrop = UiFactory.Stretch(UiFactory.CreateRect("Backdrop", transform));
+            var gradient = backdrop.gameObject.AddComponent<Image>();
+            gradient.sprite = SpriteFactory.VerticalGradient(Palette.SkyTop, Palette.SkyBottom);
+            gradient.raycastTarget = false;
+
+            // (anchor x, anchor y, size, sprite, color, bob period, phase, spin)
+            var shapes = new (float x, float y, float size, Sprite sprite, Color color, float period, float phase, float spin)[]
+            {
+                (0.10f, 0.88f, 220f, SpriteFactory.Circle, new Color(1f, 1f, 1f, 0.06f), 7f, 0.0f, 0f),
+                (0.95f, 0.70f, 260f, SpriteFactory.Circle, new Color(1f, 1f, 1f, 0.05f), 9f, 0.4f, 0f),
+                (0.05f, 0.22f, 180f, SpriteFactory.Circle, new Color(1f, 1f, 1f, 0.05f), 8f, 0.7f, 0f),
+                (0.88f, 0.92f, 34f, SpriteFactory.Sparkle, new Color(1f, 1f, 1f, 0.55f), 3.1f, 0.2f, 0f),
+                (0.16f, 0.62f, 22f, SpriteFactory.Sparkle, new Color(1f, 1f, 1f, 0.45f), 2.7f, 0.6f, 0f),
+                (0.82f, 0.40f, 26f, SpriteFactory.Sparkle, new Color(1f, 1f, 1f, 0.40f), 3.4f, 0.1f, 0f),
+                (0.24f, 0.95f, 40f, SpriteFactory.RoundedRect, WithAlpha(Palette.Red, 0.35f), 4.2f, 0.3f, 14f),
+                (0.92f, 0.16f, 46f, SpriteFactory.RoundedRect, WithAlpha(Palette.Yellow, 0.35f), 4.8f, 0.8f, -10f),
+                (0.08f, 0.44f, 34f, SpriteFactory.RoundedRect, WithAlpha(Palette.Blue, 0.45f), 5.3f, 0.5f, 12f)
+            };
+            foreach (var shape in shapes)
+            {
+                var image = UiFactory.Icon(backdrop, shape.sprite, shape.color, shape.size);
+                image.preserveAspect = false;
+                if (shape.sprite == SpriteFactory.RoundedRect)
+                {
+                    image.type = Image.Type.Sliced;
+                    image.pixelsPerUnitMultiplier = SpriteFactory.RadiusMultiplier(shape.size * 0.28f);
+                }
+                var rect = image.rectTransform;
+                rect.anchorMin = rect.anchorMax = new Vector2(shape.x, shape.y);
+                rect.anchoredPosition = Vector2.zero;
+                UiAnim.Bob(rect, shape.size * 0.06f + 4f, shape.period, shape.phase);
+                if (shape.spin != 0f) UiAnim.Spin(rect, shape.spin);
+            }
+            return backdrop.gameObject;
+        }
+
+        static Color WithAlpha(Color color, float alpha)
+        {
+            color.a = alpha;
+            return color;
         }
 
         public void ShowScreen(AppScreen screen)

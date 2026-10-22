@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 2,
+  "levelId": "L021",
+  "contentVersion": 2,
+  "ruleVersion": 2,
+  "width": 5,
+  "height": 5,
+  "walls": [
+    {
+      "x": 4,
+      "y": 0
+    },
+    {
+      "x": 3,
+      "y": 2
+    }
+  ],
+  "blocks": [
+    {
+      "id": "A",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Red"
+      ],
+      "moveAxis": "X",
+      "keyId": "K1"
+    },
+    {
+      "id": "B",
+      "x": 3,
+      "y": 3,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Blue",
+        "Yellow"
+      ],
+      "moveAxis": "Free",
+      "keyId": ""
+    },
+    {
+      "id": "C",
+      "x": 3,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Yellow",
+        "Red"
+      ],
+      "moveAxis": "Free",
+      "keyId": "K2"
+    },
+    {
+      "id": "D",
+      "x": 1,
+      "y": 1,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Blue",
+        "Red"
+      ],
+      "moveAxis": "Free",
+      "keyId": ""
+    },
+    {
+      "id": "E",
+      "x": 4,
+      "y": 2,
+      "width": 1,
+      "height": 2,
+      "layers": [
+        "Yellow",
+        "Blue"
+      ],
+      "moveAxis": "Free",
+      "keyId": ""
+    }
+  ],
+  "gates": [
+    {
+      "id": "R",
+      "side": "Left",
+      "start": 0,
+      "length": 1,
+      "color": "Red",
+      "requiredKey": "",
+      "requiredPlates": [],
+      "cycleColors": []
+    },
+    {
+      "id": "B",
+      "side": "Bottom",
+      "start": 3,
+      "length": 1,
+      "color": "Blue",
+      "requiredKey": "K2",
+      "requiredPlates": [
+        "P1"
+      ],
+      "cycleColors": []
+    },
+    {
+      "id": "Y",
+      "side": "Right",
+      "start": 3,
+      "length": 1,
+      "color": "Yellow",
+      "requiredKey": "K1",
+      "requiredPlates": [],
+      "cycleColors": []
+    },
+    {
+      "id": "T",
+      "side": "Top",
+      "start": 3,
+      "length": 1,
+      "color": "Yellow",
+      "requiredKey": "K1",
+      "requiredPlates": [],
+      "cycleColors": []
+    }
+  ],
+  "plates": [
+    {
+      "id": "P1",
+      "x": 1,
+      "y": 3
+    }
+  ],
+  "initialPhase": 0,
+  "tutorialTags": []
+}

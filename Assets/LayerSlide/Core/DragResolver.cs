@@ -26,6 +26,15 @@ namespace LayerSlide.Core
         public bool ExitIntentWithoutGate { get; private set; }
         public GateSide ExitSide { get; private set; }
 
+        /// <summary>What the refusing gate is missing while <see cref="ExitIntentWithoutGate"/> holds.</summary>
+        public GateCheck ExitCheck { get; private set; } = GateCheck.DoesNotFit;
+
+        /// <summary>Gate closest to accepting during a refused exit, or -1.</summary>
+        public int RefusingGate { get; private set; } = -1;
+
+        /// <summary>A rail block was pulled along its forbidden axis before the allowed one locked.</summary>
+        public bool ForbiddenAxisAttempt { get; private set; }
+
         public float PreviewX => AxisLocked && Axis == Axis.X ? Value : StartX;
         public float PreviewY => AxisLocked && Axis == Axis.Y ? Value : StartY;
 
@@ -38,6 +47,9 @@ namespace LayerSlide.Core
             AxisLocked = false;
             ArmedGate = -1;
             ExitIntentWithoutGate = false;
+            ExitCheck = GateCheck.DoesNotFit;
+            RefusingGate = -1;
+            ForbiddenAxisAttempt = false;
             Value = 0f;
         }
 
@@ -50,9 +62,24 @@ namespace LayerSlide.Core
             if (!AxisLocked)
             {
                 float ax = System.Math.Abs(requestedX - StartX), ay = System.Math.Abs(requestedY - StartY);
-                if (System.Math.Max(ax, ay) + RuleConstants.Epsilon < RuleConstants.AxisLockThreshold) return false;
-
-                Axis = ax + RuleConstants.Epsilon >= ay ? Axis.X : Axis.Y;
+                var rail = _board.Level.Blocks[Block].MoveAxis;
+                if (rail == MoveAxis.Free)
+                {
+                    if (System.Math.Max(ax, ay) + RuleConstants.Epsilon < RuleConstants.AxisLockThreshold) return false;
+                    Axis = ax + RuleConstants.Epsilon >= ay ? Axis.X : Axis.Y;
+                }
+                else
+                {
+                    // A rail block only compares its allowed component; the forbidden one never locks (GDD 01 §3.5).
+                    float allowed = rail == MoveAxis.X ? ax : ay, forbidden = rail == MoveAxis.X ? ay : ax;
+                    if (allowed + RuleConstants.Epsilon < RuleConstants.AxisLockThreshold)
+                    {
+                        if (forbidden + RuleConstants.Epsilon >= RuleConstants.AxisLockThreshold)
+                            ForbiddenAxisAttempt = true;
+                        return false;
+                    }
+                    Axis = rail == MoveAxis.X ? Axis.X : Axis.Y;
+                }
                 AxisLocked = true;
                 RuleEngine.GetSlideRange(_board, Block, Axis, out int min, out int max);
                 Min = min;
@@ -87,6 +114,14 @@ namespace LayerSlide.Core
 
             ExitIntentWithoutGate = intent && gate < 0;
             ArmedGate = gate;
+            RefusingGate = -1;
+            if (ExitIntentWithoutGate)
+            {
+                int edge = ExitSide.GetSign() < 0 ? Min : Max;
+                int x = Axis == Axis.X ? edge : StartX, y = Axis == Axis.Y ? edge : StartY;
+                ExitCheck = RuleEngine.DiagnoseExit(_board, Block, x, y, ExitSide, out int refusing);
+                RefusingGate = refusing;
+            }
         }
 
         /// <summary>

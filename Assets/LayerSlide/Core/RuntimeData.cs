@@ -15,7 +15,9 @@ namespace LayerSlide.Core
     [Serializable]
     public class BoardState
     {
+        public int campaignVersion = RuleConstants.CampaignVersion;
         public string levelId;
+
         public int contentVersion;
         public int ruleVersion;
         public List<RuntimeBlock> blocks = new List<RuntimeBlock>();

@@ -35,6 +35,7 @@ namespace LayerSlide.Gameplay
         const float WinFadeSeconds = 0.15f;
         const float LayerInfoSeconds = 1f;
         const float HintSeconds = 2f;
+        const float InvalidExitSeconds = 2f;
         const float MessageSeconds = 3f;
         const float HandFirstDelay = 2f;
         const float HandRepeatDelay = 5f;
@@ -87,6 +88,9 @@ namespace LayerSlide.Gameplay
         int _remainingCacheKey = -1;
         string _remainingCacheText;
         bool _tutorialShownLogged;
+        readonly List<MechanicChip> _mechanicChips = new List<MechanicChip>();
+        Level _mechanicLevel;
+        int _mechanicSignature;
 
         /// <summary>Raised once per won run, in the same step that records the completion.</summary>
         public event Action<string> LevelCompleted;
@@ -121,9 +125,12 @@ namespace LayerSlide.Gameplay
 
             _audio.Apply(_profile.settings);
             ui.Hud.SetMuted(_profile.settings.sfxVolume == 0);
+            ui.ReducedMotion = _profile.settings.reducedMotion;
 
             string notice = outcome == SaveLoadOutcome.RecoveredFromBackup ? "Son kayıt okunamadı; yedek kayıt yüklendi."
                 : outcome == SaveLoadOutcome.ProfileReset ? "Kayıtlar okunamadı; oyun yeni profille başlatıldı."
+                : outcome == SaveLoadOutcome.CampaignMigrated
+                    ? "40 bölümlük yeni kampanya hazır. Yeni mekanikleri 1. bölümden öğrenebilirsin; ayarların korundu."
                 : null;
             if (!ValidateSavedRun())
                 notice ??= "Bu bölümün kaydı yenilendi; bölüm baştan açılacak.";
@@ -316,6 +323,7 @@ namespace LayerSlide.Gameplay
             _focusBlock = block;
             _focusUntil = float.PositiveInfinity;
             _hintVisibleUntil = 0f;
+            _statusUntil = 0f; // a new touch clears the blocked-exit message
             ResetIdle();
         }
 
@@ -341,27 +349,39 @@ namespace LayerSlide.Gameplay
             Commit(command);
         }
 
-        public void OnInvalidExit(int block, GateSide side, int x, int y)
+        public void OnInvalidExit(int block, GateSide side, int x, int y, GateCheck check, int gate)
         {
             presenter.FlashInvalidExit(block, side, x, y);
             _audio.Play(Sfx.Blocked);
-            Log("invalid_exit_attempt", ("reason", InvalidExitReason(block, side, x, y)));
+            ShowStatus(InvalidExitText(block, check, gate), InvalidExitSeconds);
+            Log("invalid_exit_attempt", ("reason", gate < 0 ? "no_gate" : check.ToString()));
         }
 
-        /// <summary>"wrong_color", "partial_cover" (a gate is there but does not accept the block) or "no_gate".</summary>
-        string InvalidExitReason(int block, GateSide side, int x, int y)
+        public void OnForbiddenAxis(int block)
         {
-            var spec = _level.Blocks[block];
-            bool vertical = side.GetAxis() == Axis.X;
-            int from = vertical ? y : x, to = from + (vertical ? spec.Height : spec.Width);
-            string reason = "no_gate";
-            foreach (var gate in _level.Gates)
+            presenter.FlashRail(block);
+            ShowStatus(_level.Blocks[block].MoveAxis == MoveAxis.X ? "Yalnızca yatay hareket." : "Yalnızca dikey hareket.",
+                InvalidExitSeconds);
+        }
+
+        /// <summary>Reason text in the GDD 04 §13 priority order: axis, color, key, plates, full fit.</summary>
+        string InvalidExitText(int block, GateCheck check, int gate)
+        {
+            if (gate < 0) return "Bloğun tamamı kapıya sığmalı.";
+            var spec = _level.Gates[gate];
+            switch (check)
             {
-                if (gate.Side != side || to <= gate.Start || from >= gate.End) continue;
-                if (gate.Color != _board.GetActiveColor(block)) reason = "wrong_color";
-                else return "partial_cover";
+                case GateCheck.WrongAxis:
+                    return _level.Blocks[block].MoveAxis == MoveAxis.X ? "Yalnızca yatay hareket." : "Yalnızca dikey hareket.";
+                case GateCheck.WrongColor: return "Kapı rengi uymuyor.";
+                case GateCheck.KeyRequired: return $"{_level.Keys[spec.RequiredKey]} anahtarı gerekli.";
+                case GateCheck.PlatesRequired:
+                    if (spec.RequiredPlates.Length > 1) return "İki plaka da basılı kalmalı.";
+                    int holder = _board.GetPlateHolder(spec.RequiredPlates[0]);
+                    return holder == block ? "Başka blok plakada kalmalı."
+                        : $"{_level.Plates[spec.RequiredPlates[0]].Id} plakası basılı kalmalı.";
+                default: return "Bloğun tamamı kapıya sığmalı.";
             }
-            return reason;
         }
 
         public void OnGateArmed() => _audio.Play(Sfx.GateReady);
@@ -381,17 +401,15 @@ namespace LayerSlide.Gameplay
             _history.Push(command);
             _stateRevision++;
 
-            string completedTag = _tutorial.OnCommand(_board, command);
-            if (completedTag != null) AddUnique(_profile.tutorialCompletedIds, completedTag);
-
+            var completedTags = new List<string>(_tutorial.OnCommand(_board, command, _history.Records));
             bool won = _board.IsCleared;
-            string wonTag = null;
             if (won)
             {
                 AddUnique(_profile.completedLevelIds, _level.LevelId);
-                wonTag = _tutorial.OnLevelWon();
-                if (wonTag != null) AddUnique(_profile.tutorialCompletedIds, wonTag);
+                completedTags.AddRange(_tutorial.OnLevelWon());
             }
+            foreach (var tag in completedTags)
+                AddUnique(_profile.tutorialCompletedIds, tag);
 
             // Progress, board, history and tutorial are written together, once, before any animation.
             SyncRunToProfile();
@@ -405,8 +423,8 @@ namespace LayerSlide.Gameplay
                 int peeledBlock = _level.IndexOfBlock(command.blockId);
                 Log("layer_peeled", ("gateId", command.gateId), ("remainingLayers", _board.GetRemainingLayers(peeledBlock)), ("blockRemoved", _board.IsRemoved(peeledBlock)));
             }
-            if (completedTag != null) Log("tutorial_completed", ("tag", completedTag));
-            if (wonTag != null) Log("tutorial_completed", ("tag", wonTag));
+            foreach (var tag in completedTags)
+                Log("tutorial_completed", ("tag", tag));
             if (won)
             {
                 Log("level_completed", ("moves", _board.MoveCount), ("undoCount", _profile.currentRun.undoCount));
@@ -414,6 +432,7 @@ namespace LayerSlide.Gameplay
             }
 
             presenter.AnimateCommand(command, ReducedMotion, _history.Count);
+            presenter.ApplyMechanics(_board);
             int block = _level.IndexOfBlock(command.blockId);
             _focusBlock = block;
             _focusUntil = Time.unscaledTime + LayerInfoSeconds;
@@ -448,6 +467,7 @@ namespace LayerSlide.Gameplay
             Save();
 
             presenter.AnimateUndo(command, ReducedMotion);
+            presenter.ApplyMechanics(_board);
             presenter.HideHint();
             _audio.Play(Sfx.Undo);
             Log("undo_used", ("historyDepth", _history.Count));
@@ -520,8 +540,8 @@ namespace LayerSlide.Gameplay
             buttons.Add(("Tekrar oyna", () => StartLevel(levelId, resume: false)));
             buttons.Add(("Bölümler", ShowLevelSelect));
 
-            string title = last ? $"{LevelCatalog.Count} bölüm tamamlandı!" : "Bölüm tamamlandı";
-            ui.Modal.Show(ModalId.Won, title, null, buttons, ReducedMotion ? 0f : WinFadeSeconds);
+            string message = last ? $"{LevelCatalog.Count} bölüm tamamlandı!" : $"Bölüm {LevelCatalog.GetNumber(levelId)} tamamlandı";
+            ui.Modal.Show(ModalId.Won, last ? "Muhteşem!" : "Harika!", message, buttons, ReducedMotion ? 0f : WinFadeSeconds);
         }
 
         void TrackActiveTime()
@@ -562,6 +582,8 @@ namespace LayerSlide.Gameplay
                 ui.Hud.SetLayerInfo(layerInfo);
             }
 
+            RefreshMechanicRow();
+
             if (_hintVisibleUntil > 0f && now >= _hintVisibleUntil)
             {
                 _hintVisibleUntil = 0f;
@@ -596,12 +618,71 @@ namespace LayerSlide.Gameplay
             int key = block * 4 + removed;
             if (_sequenceCache.TryGetValue(key, out var text)) return text;
 
-            var layers = _level.Blocks[block].Layers;
+            var spec = _level.Blocks[block];
+            var layers = spec.Layers;
+            string rail = spec.MoveAxis == MoveAxis.X ? "Yatay" : spec.MoveAxis == MoveAxis.Y ? "Dikey" : "Serbest";
             text = removed + 1 < layers.Length
-                ? $"Şimdi: {Palette.NameOf(layers[removed])} → Sonra: {Palette.NameOf(layers[removed + 1])}"
-                : $"Şimdi: {Palette.NameOf(layers[removed])} • Son katman";
+                ? $"{rail} • Şimdi: {Palette.NameOf(layers[removed])} → Sonra: {Palette.NameOf(layers[removed + 1])}"
+                : $"{rail} • Şimdi: {Palette.NameOf(layers[removed])} • Son katman";
             _sequenceCache[key] = text;
             return text;
+        }
+
+        /// <summary>
+        /// K1/K2, P1/P2 and the phase gate row (GDD 04 §13). Rebuilt only when the derived state changes, which is
+        /// packed into one signature: key bits, plate-held bits and the phase.
+        /// </summary>
+        void RefreshMechanicRow()
+        {
+            int signature = 1 << 30;
+            for (int k = 0; k < _level.Keys.Length; k++)
+                if (_board.HasKey(k)) signature |= 1 << k;
+            for (int p = 0; p < _level.Plates.Length; p++)
+                if (_board.GetPlateHolder(p) >= 0) signature |= 1 << (4 + p);
+            signature |= _board.Phase << 8;
+            if (_mechanicLevel == _level && signature == _mechanicSignature) return;
+            _mechanicLevel = _level;
+            _mechanicSignature = signature;
+
+            _mechanicChips.Clear();
+            var dim = new Color(1f, 1f, 1f, 0.55f);
+            for (int k = 0; k < _level.Keys.Length; k++)
+            {
+                bool has = _board.HasKey(k);
+                _mechanicChips.Add(new MechanicChip
+                {
+                    Icon = has ? SpriteFactory.Check : SpriteFactory.Lock,
+                    IconColor = has ? Palette.Green : dim,
+                    Label = _level.Keys[k],
+                    LabelColor = has ? Color.white : dim
+                });
+            }
+            for (int p = 0; p < _level.Plates.Length; p++)
+            {
+                bool held = _board.GetPlateHolder(p) >= 0;
+                _mechanicChips.Add(new MechanicChip
+                {
+                    Icon = held ? SpriteFactory.Circle : SpriteFactory.Ring,
+                    IconColor = held ? Color.white : dim,
+                    Label = _level.Plates[p].Id,
+                    LabelColor = held ? Color.white : dim
+                });
+            }
+            for (int g = 0; g < _level.Gates.Length; g++)
+            {
+                var gate = _level.Gates[g];
+                if (!gate.HasPhase) continue;
+                var now = gate.ColorAt(_board.Phase);
+                var next = gate.ColorAt(_board.Phase + 1);
+                _mechanicChips.Add(new MechanicChip
+                {
+                    Icon = SpriteFactory.RoundedRect,
+                    IconColor = Palette.Of(now),
+                    Label = $"{gate.Id}: {Palette.NameOf(now)[0]}→{Palette.NameOf(next)[0]}",
+                    LabelColor = Color.white
+                });
+            }
+            ui.Hud.SetMechanics(_mechanicChips);
         }
 
         string RemainingLayersText()
@@ -630,19 +711,33 @@ namespace LayerSlide.Gameplay
             presenter.HideTutorialHand();
         }
 
-        /// <summary>L001 only: hand trace after 2 s of inactivity, then every 5 s, until the first peel (GDD 02 §5).</summary>
+        /// <summary>
+        /// L001 only: ghost trace of the first recorded action after 2 s of inactivity, then every 5 s, until the
+        /// first valid command (GDD 02 §4).
+        /// </summary>
         void UpdateTutorialHand()
         {
-            if (!_tutorial.ShowsDragHand || _state != PlayState.Idle || ui.Modal.IsOpen || ui.CurrentScreen != AppScreen.Playing)
+            if (!_tutorial.ShowsGhostArrow(_history.Count) || _state != PlayState.Idle || ui.Modal.IsOpen
+                || ui.CurrentScreen != AppScreen.Playing)
                 return;
 
             _idleSeconds += Time.unscaledDeltaTime;
             if (_idleSeconds < _nextHandAt) return;
 
-            int block = _level.IndexOfBlock("A");
+            var solution = LevelCatalog.LoadSolution(_level.LevelId);
+            if (solution == null || solution.actions.Count == 0) return;
+            var action = solution.actions[0];
+            int block = _level.IndexOfBlock(action.block);
             if (block < 0 || _board.IsRemoved(block)) return;
             var from = presenter.BlockCenter(block, _board.GetX(block), _board.GetY(block));
-            var to = presenter.BlockCenter(block, 0, _board.GetY(block)) + Vector3.left * RuleConstants.ExitIntentThreshold;
+            var to = presenter.BlockCenter(block, action.x, action.y);
+            int gate = string.IsNullOrEmpty(action.exit) ? -1 : _level.IndexOfGate(action.exit);
+            if (gate >= 0)
+            {
+                var side = _level.Gates[gate].Side;
+                var outward = side.GetAxis() == Axis.X ? Vector3.right : Vector3.forward;
+                to += outward * (side.GetSign() * RuleConstants.ExitIntentThreshold);
+            }
             presenter.PlayTutorialHand(from, to, ReducedMotion);
             _nextHandAt = _idleSeconds + HandRepeatDelay;
         }
@@ -1022,6 +1117,7 @@ namespace LayerSlide.Gameplay
             var settings = _profile.settings;
             _audio.Apply(settings);
             ui.Hud.SetMuted(settings.sfxVolume == 0);
+            ui.ReducedMotion = settings.reducedMotion;
             ui.Settings.Refresh(settings);
             if (_level != null) presenter.SetSymbolsVisible(settings.colorSymbols);
         }

@@ -25,6 +25,8 @@ namespace LayerSlide.Editor
     {
         const string Root = "Assets/LayerSlide";
         const string MaterialsFolder = Root + "/Art/Materials";
+        const string ToyShader = "LayerSlide/Toy";
+
         const string RenderingFolder = Root + "/Data/Rendering";
         const string ScenesFolder = Root + "/Scenes";
         const string ThemePath = Root + "/Data/VisualTheme.asset";
@@ -44,6 +46,7 @@ namespace LayerSlide.Editor
             var pipeline = CreateRenderPipeline();
             AssetBaker.BakeAudio();
             AssetBaker.BakeIconAndSplash();
+            AssetBaker.BakeBackgroundTextures();
             CreateTheme();
             // Persist generated assets first: opening a new scene unloads unsaved in-memory assets.
             AssetDatabase.SaveAssets();
@@ -206,27 +209,84 @@ namespace LayerSlide.Editor
                 AssetDatabase.CreateAsset(theme, ThemePath);
             }
 
-            theme.red = LitMaterial("Red", Palette.Red, 0.30f);
-            theme.blue = LitMaterial("Blue", Palette.Blue, 0.30f);
-            theme.yellow = LitMaterial("Yellow", Palette.Yellow, 0.30f);
-            theme.board = LitMaterial("Board", Palette.Board, 0.10f);
-            theme.wall = LitMaterial("Wall", Palette.Wall, 0.10f);
-            theme.perimeter = LitMaterial("Perimeter", new Color(0.79f, 0.83f, 0.87f), 0.10f);
+            // Molded "candy plastic" blocks (bright cap, deeper sides, raised panel); the board is a matte toy tray.
+            theme.red = ToyMaterial("Red", Palette.Red, Palette.Darken(Palette.Red, 0.30f), 0.07f, 0.5f, 0.35f);
+            theme.blue = ToyMaterial("Blue", Palette.Blue, Palette.Darken(Palette.Blue, 0.30f), 0.07f, 0.5f, 0.35f);
+            theme.yellow = ToyMaterial("Yellow", Palette.Yellow, Palette.Darken(Palette.Yellow, 0.24f), 0.06f, 0.5f, 0.35f);
+            theme.board = ToyMaterial("Board", Palette.Tray, Palette.PanelLip, 0f, 0.15f, 0f);
+            theme.boardCell = ToyMaterial("BoardCell", Palette.BoardCell, Palette.Darken(Palette.BoardCell, 0.12f), 0.025f, 0.08f, 0f);
+            theme.boardCellAlt = ToyMaterial("BoardCellAlt", Palette.BoardCellAlt, Palette.Darken(Palette.BoardCellAlt, 0.12f), 0.02f, 0.08f, 0f);
+            theme.boardWell = ToyMaterial("BoardWell", Palette.BoardWell, Palette.Darken(Palette.BoardWell, 0.15f), 0f, 0f, 0f);
+            theme.wall = ToyMaterial("Wall", Palette.Wall, Palette.Darken(Palette.Wall, 0.22f), 0.06f, 0.3f, 0.25f);
+            theme.perimeter = ToyMaterial("Perimeter", Palette.PanelInset, Palette.PanelLip, 0.03f, 0.25f, 0.15f);
             theme.white = UnlitMaterial("UnlitWhite", Color.white);
             theme.dark = UnlitMaterial("UnlitDark", Palette.Text);
             theme.whiteTransparent = TransparentUnlitMaterial("UnlitWhiteTransparent", new Color(1f, 1f, 1f, 0.55f));
+            theme.background = UnlitMaterial("SkyBackground", Color.white);
+            theme.background.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(AssetBaker.SkyGradientPath));
+            theme.blobShadow = TransparentUnlitMaterial("BlobShadow", new Color(0.16f, 0.08f, 0.42f, 0.32f));
+            theme.blobShadow.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(AssetBaker.BlobShadowPath));
+            theme.gloss = TransparentUnlitMaterial("Gloss", new Color(1f, 1f, 1f, 0.34f));
             theme.meshBank = AssetBaker.BakeMeshes();
-            theme.regularFont = FontAsset("NotoSans-Regular");
-            theme.semiBoldFont = FontAsset("NotoSans-SemiBold");
+
+            var fallback = FontAsset("NotoSans-SemiBold");
+            theme.bodyFont = FontAsset("Baloo2-SemiBold", fallback);
+            theme.displayFont = FontAsset("Baloo2-ExtraBold", fallback);
+            // Titles: thick dark outline plus a hard drop shadow. Buttons: a softer shadow only.
+            theme.titleTextMaterial = TextPreset(theme.displayFont, "Baloo2-ExtraBold Title", 0.24f, Palette.TextOutline,
+                new Color(0.10f, 0.05f, 0.30f, 0.55f), -0.9f, 0.05f, 0.25f);
+            theme.buttonTextMaterial = TextPreset(theme.displayFont, "Baloo2-ExtraBold Button", 0f, Color.clear,
+                new Color(0.10f, 0.05f, 0.30f, 0.30f), -0.75f, 0.1f, 0f);
             EditorUtility.SetDirty(theme);
         }
 
-        static Material LitMaterial(string name, Color color, float smoothness)
+        /// <summary>SDF material preset (outline and/or underlay) sharing the font's atlas.</summary>
+        static Material TextPreset(TMP_FontAsset font, string name, float outlineWidth, Color outlineColor, Color underlayColor,
+            float underlayOffsetY, float underlaySoftness, float underlayDilate)
         {
-            var material = LoadOrCreateMaterial(name, "Universal Render Pipeline/Lit");
-            material.SetColor("_BaseColor", color);
-            material.SetFloat("_Metallic", 0f);
-            material.SetFloat("_Smoothness", smoothness);
+            string path = $"{Root}/Fonts/{name}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(font.material) { name = name };
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.shader = font.material.shader;
+            material.SetTexture(ShaderUtilities.ID_MainTex, font.atlasTexture);
+            material.SetFloat(ShaderUtilities.ID_GradientScale, font.atlasPadding + 1);
+            material.SetFloat(ShaderUtilities.ID_TextureWidth, font.atlasWidth);
+            material.SetFloat(ShaderUtilities.ID_TextureHeight, font.atlasHeight);
+
+            material.SetColor(ShaderUtilities.ID_OutlineColor, outlineColor);
+            material.SetFloat(ShaderUtilities.ID_OutlineWidth, outlineWidth);
+            if (outlineWidth > 0f) material.EnableKeyword(ShaderUtilities.Keyword_Outline);
+            else material.DisableKeyword(ShaderUtilities.Keyword_Outline);
+            // Dilate by the outline so the outline grows outward and letter counters stay open.
+            material.SetFloat(ShaderUtilities.ID_FaceDilate, outlineWidth * 0.6f);
+
+            material.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+            material.SetColor(ShaderUtilities.ID_UnderlayColor, underlayColor);
+            material.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, 0f);
+            material.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, underlayOffsetY);
+            material.SetFloat(ShaderUtilities.ID_UnderlaySoftness, underlaySoftness);
+            material.SetFloat(ShaderUtilities.ID_UnderlayDilate, underlayDilate + outlineWidth);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        /// <summary>LayerSlide/Toy material: top and side colors, panel lift, plastic highlight and contact darkening.</summary>
+        static Material ToyMaterial(string name, Color top, Color side, float panel, float highlight, float contact)
+        {
+            var material = LoadOrCreateMaterial(name, ToyShader);
+            material.shader = Shader.Find(ToyShader); // older materials were URP Lit
+            material.SetColor("_BaseColor", top);
+            material.SetColor("_SideColor", side);
+            material.SetColor("_ShadowTint", new Color(0.66f, 0.58f, 0.95f));
+            material.SetFloat("_PanelLight", panel);
+            material.SetFloat("_SpecStrength", highlight);
+            material.SetFloat("_SpecSize", 6f);
+            material.SetFloat("_RimStrength", 0.14f);
+            material.SetFloat("_ContactAO", contact);
             material.enableInstancing = true;
             EditorUtility.SetDirty(material);
             return material;
@@ -273,17 +333,24 @@ namespace LayerSlide.Editor
             return material;
         }
 
-        /// <summary>Dynamic SDF font asset backed by the bundled Noto Sans file, pre-warmed with Turkish glyphs.</summary>
-        static TMP_FontAsset FontAsset(string fileName)
+        /// <summary>
+        /// Dynamic SDF font asset backed by a bundled font file, pre-warmed with Turkish glyphs. The 10 px padding
+        /// leaves room for the thick title outline.
+        /// </summary>
+        static TMP_FontAsset FontAsset(string fileName, TMP_FontAsset fallback = null)
         {
             string assetPath = $"{Root}/Fonts/{fileName} SDF.asset";
             var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(assetPath);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                SetFallback(existing, fallback);
+                return existing;
+            }
 
             var font = AssetDatabase.LoadAssetAtPath<Font>($"{Root}/Fonts/{fileName}.ttf");
             if (font == null) throw new FileNotFoundException($"Font {fileName}.ttf is missing.");
 
-            var asset = TMP_FontAsset.CreateFontAsset(font, 64, 6, GlyphRenderMode.SDFAA, 1024, 1024, AtlasPopulationMode.Dynamic, false);
+            var asset = TMP_FontAsset.CreateFontAsset(font, 72, 10, GlyphRenderMode.SDFAA, 1024, 1024, AtlasPopulationMode.Dynamic, false);
             asset.name = fileName + " SDF";
             AssetDatabase.CreateAsset(asset, assetPath);
             asset.material.name = fileName + " SDF Material";
@@ -291,8 +358,18 @@ namespace LayerSlide.Editor
             AssetDatabase.AddObjectToAsset(asset.material, asset);
             AssetDatabase.AddObjectToAsset(asset.atlasTextures[0], asset);
             asset.TryAddCharacters(PrewarmCharacters);
+            SetFallback(asset, fallback);
             EditorUtility.SetDirty(asset);
             return asset;
+        }
+
+        static void SetFallback(TMP_FontAsset asset, TMP_FontAsset fallback)
+        {
+            if (fallback == null || asset == fallback) return;
+            asset.fallbackFontAssetTable ??= new System.Collections.Generic.List<TMP_FontAsset>();
+            if (asset.fallbackFontAssetTable.Contains(fallback)) return;
+            asset.fallbackFontAssetTable.Add(fallback);
+            EditorUtility.SetDirty(asset);
         }
 
         // ---------------------------------------------------------------- Scenes
@@ -326,8 +403,9 @@ namespace LayerSlide.Editor
             var theme = AssetDatabase.LoadAssetAtPath<VisualTheme>(ThemePath);
             var title = new GameObject("Title", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
             title.transform.SetParent(canvasObject.transform, false);
-            title.font = theme.semiBoldFont;
-            title.fontSize = 32f;
+            title.font = theme.displayFont;
+            if (theme.titleTextMaterial != null) title.fontSharedMaterial = theme.titleTextMaterial;
+            title.fontSize = 40f;
             title.alignment = TextAlignmentOptions.Center;
             title.color = Color.white;
             title.text = "Layer Slide";
@@ -344,17 +422,21 @@ namespace LayerSlide.Editor
             var theme = AssetDatabase.LoadAssetAtPath<VisualTheme>(ThemePath);
             if (theme == null) throw new FileNotFoundException("Visual theme asset is missing.", ThemePath);
 
+            // Soft three-color ambient (lavender sky, cooler sides, violet bounce) under one warm key light.
             RenderSettings.skybox = null;
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = Palette.Ambient * 0.65f;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.86f, 0.83f, 1.00f) * 0.85f;
+            RenderSettings.ambientEquatorColor = Palette.Ambient * 0.62f;
+            RenderSettings.ambientGroundColor = new Color(0.45f, 0.38f, 0.78f) * 0.5f;
             RenderSettings.fog = false;
 
             var light = new GameObject("DirectionalLight").AddComponent<Light>();
             light.type = LightType.Directional;
-            light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-            light.intensity = 1.2f;
-            light.color = Color.white;
+            light.transform.rotation = Quaternion.Euler(58f, -28f, 0f);
+            light.intensity = 1.05f;
+            light.color = new Color(1f, 0.97f, 0.92f);
             light.shadows = LightShadows.Soft;
+            light.shadowStrength = 0.55f;
 
             // Clears the whole screen behind the HUD; the board camera only draws inside the BoardRect.
             var background = new GameObject("BackgroundCamera").AddComponent<Camera>();
@@ -372,6 +454,7 @@ namespace LayerSlide.Editor
             boardCamera.allowHDR = false;
             boardCamera.allowMSAA = true;
             var framer = boardCameraObject.AddComponent<CameraFramer>();
+            SetReference(framer, "background", theme.background);
 
             var boardRoot = new GameObject("BoardRoot");
             var presenter = boardRoot.AddComponent<BoardPresenter>();

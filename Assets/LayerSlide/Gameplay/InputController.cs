@@ -17,7 +17,10 @@ namespace LayerSlide.Gameplay
         void OnBlockTapped(int block);
         /// <summary>Released after a drag. The handler validates and commits through the rule engine.</summary>
         void OnBlockReleased(int block, int x, int y, int gate);
-        void OnInvalidExit(int block, GateSide side, int x, int y);
+        /// <summary>Outward release on a reachable edge that no gate accepts; <paramref name="check"/> says what is missing.</summary>
+        void OnInvalidExit(int block, GateSide side, int x, int y, GateCheck check, int gate);
+        /// <summary>A rail block was pulled only along its forbidden axis (F1).</summary>
+        void OnForbiddenAxis(int block);
         void OnGateArmed();
         void OnDragCancelled(int block);
     }
@@ -120,6 +123,7 @@ namespace LayerSlide.Gameplay
 
             if (!_drag.TryGetRelease(out int x, out int y, out int gate))
             {
+                if (_drag.ForbiddenAxisAttempt) _handler.OnForbiddenAxis(_drag.Block);
                 _handler.OnBlockTapped(_drag.Block);
                 return;
             }
@@ -127,7 +131,7 @@ namespace LayerSlide.Gameplay
             if (gate < 0 && _drag.ExitIntentWithoutGate)
             {
                 _drag.GetExitEdge(out int edgeX, out int edgeY);
-                _handler.OnInvalidExit(_drag.Block, _drag.ExitSide, edgeX, edgeY);
+                _handler.OnInvalidExit(_drag.Block, _drag.ExitSide, edgeX, edgeY, _drag.ExitCheck, _drag.RefusingGate);
             }
             _handler.OnBlockReleased(_drag.Block, x, y, gate);
         }

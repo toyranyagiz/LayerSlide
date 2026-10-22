@@ -4,7 +4,7 @@ namespace LayerSlide.Services
 {
     /// <summary>
     /// Plays the seven effects on four voices routed to the SFX mixer group, plus optional vibration (GDD 04 §9).
-    /// Clips come from the WAV assets in <see cref="SfxLibrary"/>; synthesis is only a fallback for missing assets.
+    /// Clips come from the audio assets in <see cref="SfxLibrary"/>; synthesis is only a fallback for missing assets.
     /// </summary>
     public sealed class AudioHapticsService : MonoBehaviour
     {

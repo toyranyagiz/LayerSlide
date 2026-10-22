@@ -5,7 +5,7 @@ using LayerSlide.Core;
 namespace LayerSlide.Services
 {
     /// <summary>
-    /// Field/type checks for the save payload and the saveVersion 1 to 2 migration (GDD 06 §7).
+    /// Field/type checks for the save payload and the migration of saveVersion 1/2 (campaign 1) to 3 (GDD 06 §7).
     /// Runs on a parsed <see cref="JsonNode"/> tree, so a missing field or a wrong type rejects the candidate
     /// instead of being silently defaulted by JsonUtility.
     /// </summary>
@@ -22,23 +22,49 @@ namespace LayerSlide.Services
             version = (int)versionNode.Number;
 
             if (version == SaveService.SaveVersion)
-                return ReadProfile(root, strict: true);
-            if (version == 1)
+                return ReadProfile(root, strict: true, campaign2: true);
+            if (version == 1 || version == 2)
             {
+                // Each old file is first checked against its own schema, then moved to campaign 2.
+                var old = ReadProfile(root, strict: version == 2, campaign2: false);
+                if (old == null) return null;
                 migrated = true;
-                return ReadProfile(root, strict: false);
+                return MigrateToCampaign2(old);
             }
             return null;
         }
 
         /// <summary>
-        /// strict = saveVersion 2: every field must exist with the right type.
-        /// Otherwise (saveVersion 1) missing settings / run counters fall back to defaults and the run may be
-        /// stored under "BoardState".
+        /// Campaign 1 to 2 (GDD 05 §12): settings stay; completed ids are archived and never unlock the new
+        /// layouts; tutorials, the run and the first-launch flag start over so the new campaign opens at L001.
         /// </summary>
-        static PlayerSave ReadProfile(JsonNode root, bool strict)
+        static PlayerSave MigrateToCampaign2(PlayerSave old)
+        {
+            var save = new PlayerSave
+            {
+                saveVersion = SaveService.SaveVersion,
+                campaignVersion = RuleConstants.CampaignVersion,
+                revision = old.revision,
+                settings = old.settings,
+                isFirstLaunchCompleted = false
+            };
+            save.legacyCampaign1CompletedLevelIds.AddRange(old.completedLevelIds);
+            return save;
+        }
+
+        /// <summary>
+        /// strict = every field must exist with the right type (saveVersion 2 and 3).
+        /// Otherwise (saveVersion 1) missing settings / run counters fall back to defaults and the run may be
+        /// stored under "BoardState". campaign2 = saveVersion 3 fields (campaign version, legacy list).
+        /// </summary>
+        static PlayerSave ReadProfile(JsonNode root, bool strict, bool campaign2)
         {
             var save = new PlayerSave { saveVersion = SaveService.SaveVersion };
+            if (campaign2)
+            {
+                if (!Int(root, "campaignVersion", true, out save.campaignVersion)) return null;
+                if (!StringList(root, "legacyCampaign1CompletedLevelIds", true, save.legacyCampaign1CompletedLevelIds)) return null;
+            }
             if (!Long(root, "revision", true, out save.revision) || save.revision < 0) return null;
             if (!StringList(root, "completedLevelIds", true, save.completedLevelIds)) return null;
             if (!StringList(root, "tutorialCompletedIds", strict, save.tutorialCompletedIds)) return null;
@@ -52,7 +78,7 @@ namespace LayerSlide.Services
             if (run == null && strict) return null;
             if (run != null && run.Kind != JsonKind.Null)
             {
-                save.currentRun = ReadRun(run, strict);
+                save.currentRun = ReadRun(run, strict, campaign2);
                 if (save.currentRun == null) return null;
             }
             return save;
@@ -78,13 +104,13 @@ namespace LayerSlide.Services
             return true;
         }
 
-        static RunSave ReadRun(JsonNode node, bool strict)
+        static RunSave ReadRun(JsonNode node, bool strict, bool campaign2)
         {
             if (node.Kind != JsonKind.Object) return null;
             var run = new RunSave();
 
             var board = node.Get("boardState") ?? (strict ? null : node.Get("BoardState"));
-            if (board == null || !ReadBoardState(board, run.boardState)) return null;
+            if (board == null || !ReadBoardState(board, run.boardState, campaign2)) return null;
 
             var history = node.Get("history");
             if (history == null)
@@ -109,9 +135,11 @@ namespace LayerSlide.Services
             return run;
         }
 
-        static bool ReadBoardState(JsonNode node, BoardState state)
+        static bool ReadBoardState(JsonNode node, BoardState state, bool campaign2)
         {
             if (node.Kind != JsonKind.Object) return false;
+            if (campaign2 && !Int(node, "campaignVersion", true, out state.campaignVersion)) return false;
+
             if (!String(node, "levelId", true, out state.levelId)) return false;
             if (!Int(node, "contentVersion", true, out state.contentVersion)) return false;
             if (!Int(node, "ruleVersion", true, out state.ruleVersion)) return false;

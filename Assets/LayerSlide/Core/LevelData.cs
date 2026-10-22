@@ -22,6 +22,10 @@ namespace LayerSlide.Core
         public int width;
         public int height;
         public List<string> layers = new List<string>();
+        /// <summary>"Free", "X" or "Y".</summary>
+        public string moveAxis = "Free";
+        /// <summary>Key granted when the last layer is removed, or "".</summary>
+        public string keyId = string.Empty;
     }
 
     [Serializable]
@@ -32,6 +36,20 @@ namespace LayerSlide.Core
         public int start;
         public int length;
         public string color;
+        /// <summary>Key that must already be collected, or "".</summary>
+        public string requiredKey = string.Empty;
+        /// <summary>Plates that other blocks must hold down at the same time.</summary>
+        public List<string> requiredPlates = new List<string>();
+        /// <summary>Empty, or two different colors the gate alternates between on every peel.</summary>
+        public List<string> cycleColors = new List<string>();
+    }
+
+    [Serializable]
+    public class PlateDefinition
+    {
+        public string id;
+        public int x;
+        public int y;
     }
 
     [Serializable]
@@ -47,6 +65,8 @@ namespace LayerSlide.Core
         public List<BlockDefinition> blocks = new List<BlockDefinition>();
         public List<GateDefinition> gates = new List<GateDefinition>();
         public List<string> tutorialTags = new List<string>();
+        public List<PlateDefinition> plates = new List<PlateDefinition>();
+        public int initialPhase;
     }
 
     [Serializable]

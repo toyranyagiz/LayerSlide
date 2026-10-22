@@ -1,0 +1,4 @@
+Sound effects in this folder (*.ogg) are from Kenney (www.kenney.nl), CC0 1.0:
+  Interface Sounds 1.0: select=pluck_001, blocked=error_004, gate_ready=glass_003, peel=maximize_008, clear=confirmation_001, undo=minimize_008
+  Music Jingles: win=jingles_PIZZI02
+License: http://creativecommons.org/publicdomain/zero/1.0/

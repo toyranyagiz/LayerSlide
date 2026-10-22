@@ -1,0 +1,157 @@
+{
+  "levelId": "L019",
+  "contentVersion": 2,
+  "ruleVersion": 2,
+  "actions": [
+    {
+      "block": "B",
+      "x": 3,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 1,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 3,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "A",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "C",
+      "x": 3,
+      "y": 4,
+      "exit": "T"
+    },
+    {
+      "block": "C",
+      "x": 2,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 3,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 2,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "C",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "E",
+      "x": 1,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 3,
+      "y": 0,
+      "exit": "B"
+    },
+    {
+      "block": "B",
+      "x": 2,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 2,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 3,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 3,
+      "y": 4,
+      "exit": "T"
+    },
+    {
+      "block": "D",
+      "x": 3,
+      "y": 0,
+      "exit": "B"
+    },
+    {
+      "block": "D",
+      "x": 3,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "E",
+      "x": 1,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 3,
+      "y": 4,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 3,
+      "y": 4,
+      "exit": "T"
+    }
+  ]
+}

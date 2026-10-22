@@ -34,7 +34,8 @@ Tasarımın tek kaynağı Notion'daki **Layer Slide — Kesin Oyun Tasarım Dok�
 | --- | --- |
 | Level Editor | Bölüm listesi, ızgara, alan düzenleme; Validate / Play Recorded Solution / Search Solution / Reset Preview / Export JSON |
 | Validate Levels | Statik doğrulama + bütün kayıtlı çözümlerin replay'i (build kapısı) |
-| Setup Project | Sahneleri, materyalleri, fontları, mesh bankasını, WAV'ları, mixer'ı, ikonu, URP ve player ayarlarını yeniden üretir |
+| Setup Project | Sahneleri, materyalleri, fontları ve metin stillerini, mesh bankasını, gökyüzü/gölge dokularını, ses kütüphanesini, mixer'ı, ikonu, URP ve player ayarlarını yeniden üretir |
+| Capture Game View | Play modda arka plan + tahta + UI'ı `Captures/` altına PNG olarak kaydeder (yerel inceleme; Git'e girmez) |
 | Build → Release APK / Development APK | `Builds/LayerSlide-1.0.0-arm64.apk` (+ `.BuildManifest.json`) |
 | Export Test Log → From Editor / From Android Device (adb) | Development build günlüklerini `TestLogs/` altına toplar |
 | Delete Local Save | Editördeki yerel kaydı siler |
@@ -66,10 +67,10 @@ Keystore ve parola Git'e girmez; ProjectSettings'e de yazılmaz (yalnızca build
 | `Core` | Unity'den bağımsız saf C#: `Level`, `Board`, `RuleEngine`, `DragResolver`, `CommandHistory`, `LevelValidator`, `SolutionReplayer`, `HintSolver` |
 | `Gameplay` | `GameController` (durum makinesi, ekran akışı), `InputController`, `PointerReader`, `TutorialTracker` |
 | `Presentation` | `BoardPresenter`, `BlockView`, `GateView`, `CameraFramer`, `FxPool`, `MeshLibrary` + `MeshBank`, `Palette`, `VisualTheme` |
-| `UI` | Koddan kurulan uGUI ekranları: HUD, ana menü, bölüm listesi, ayarlar, hakkında, modal, bildirim |
+| `UI` | Koddan kurulan uGUI ekranları: HUD, ana menü, bölüm listesi, ayarlar, hakkında, modal, bildirim; `ChunkyButton` (basılan buton), `UiAnim` (pop/bob/pulse), SDF ile çizilen ikonlar (`SpriteFactory`) |
 | `Services` | `SaveService` + `SaveFormat` + `JsonTree`, `HintService`, `AudioHapticsService` + `SfxLibrary` + `OutputLimiter`, `LocalTestLogger`, `LevelCatalog`, `AppServices`, `Bootstrap` |
 | `Resources` | `Levels/`, `Solutions/` JSON'ları, `Audio/SfxLibrary`, font lisansı |
-| `Art`, `Audio`, `Fonts`, `Data` | Materyaller, mesh bankası, ikon; 7 WAV + mixer; Noto Sans + TMP font assetleri; tema ve URP assetleri |
+| `Art`, `Audio`, `Fonts`, `Data` | Materyaller, mesh bankası, ikon, gökyüzü ve gölge dokuları; 7 OGG ses efekti + mixer; Baloo 2 (başlık/gövde) + Noto Sans (yedek) TMP font assetleri ve metin stilleri; tema ve URP assetleri |
 | `Editor` | `ProjectSetup`, `AssetBaker`, `LevelEditorWindow`, `LevelTools`, `AndroidBuild`, `AndroidManifestPostProcessor` |
 | `Tests/EditMode`, `Tests/PlayMode` | Kural, girdi, öğretici, kayıt, ipucu, performans testleri; gerçek dokunma olaylarıyla sahne testleri |
 
@@ -85,8 +86,11 @@ Unity -batchmode -projectPath . -runTests -testPlatform PlayMode -assemblyNames 
 
 `-assemblyNames` filtresi, `testables` ile derlenen Input System paketinin kendi testlerini dışarıda tutar.
 `LAYERSLIDE_CAPTURE_DIR` verilirse PlayMode testi ekran görüntüleri de kaydeder.
+**Dikkat:** PlayMode testleri editördeki yerel kaydı (`save.json/.bak/.tmp`) siler; kendi ilerlemeni korumak için önce yedekle.
 
 ## Lisanslar
 
-Noto Sans yazı tipi SIL Open Font License 1.1 ile dağıtılır (`Assets/LayerSlide/Fonts/OFL.txt`).
-Ses efektleri, mesh'ler ve ikon proje içinde üretilir; dış ses/model/görsel varlığı kullanılmaz.
+Baloo 2 ve Noto Sans yazı tipleri SIL Open Font License 1.1 ile dağıtılır (`Assets/LayerSlide/Fonts/Baloo2-OFL.txt`, `OFL.txt`).
+Baloo 2 dosyaları, Google Fonts'taki değişken fonttan 600 ve 800 ağırlıklarında statik olarak çıkarılmıştır.
+Ses efektleri Kenney'nin "Interface Sounds" ve "Music Jingles" paketlerindendir (CC0 1.0; eşleşmeler `Assets/LayerSlide/Audio/Kenney-CC0.txt`).
+Mesh'ler, UI ikonları ve uygulama ikonu proje içinde koddan üretilir.

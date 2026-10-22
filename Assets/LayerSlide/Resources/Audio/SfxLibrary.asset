@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: SfxLibrary
   m_EditorClassIdentifier: LayerSlide.Runtime::LayerSlide.Services.SfxLibrary
   clips:
-  - {fileID: 8300000, guid: 1cac1c63742b09b418dc54e7e1f70a08, type: 3}
-  - {fileID: 8300000, guid: 0db0912f9a564c044b7f1a3d07a068d4, type: 3}
-  - {fileID: 8300000, guid: 3df36edbac082584fb6b8c2da813d22e, type: 3}
-  - {fileID: 8300000, guid: bb973bbb989fabd42bc0aeaf666f1f91, type: 3}
-  - {fileID: 8300000, guid: eaed84c5170556c46a1ac67e42653647, type: 3}
-  - {fileID: 8300000, guid: dc2e6d3619ab5d54b9e92dbb196b1cb6, type: 3}
-  - {fileID: 8300000, guid: 3a7083ca2a58fb1448a8684586c7d7ca, type: 3}
+  - {fileID: 8300000, guid: db2f3c43cec9e2f42ada50d75d6175a8, type: 3}
+  - {fileID: 8300000, guid: edf8d4dfff771864b8513bc9f181da02, type: 3}
+  - {fileID: 8300000, guid: 0862ef00c73a33b4e8aa707be8850178, type: 3}
+  - {fileID: 8300000, guid: 7f0ca283396903945a8a12ae82849f22, type: 3}
+  - {fileID: 8300000, guid: 5db792ea9b439c7468acf8279e9ab45b, type: 3}
+  - {fileID: 8300000, guid: c07f08b9176508d4a9a5dc09dd65693e, type: 3}
+  - {fileID: 8300000, guid: 812d7fdac258f8c4dbe7ce796c42f0c2, type: 3}
   output: {fileID: -2209051145392008621, guid: bc226a1118b34ea418216332c3cffd34, type: 2}

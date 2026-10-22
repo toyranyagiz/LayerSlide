@@ -1,21 +1,125 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "levelId": "L009",
-  "contentVersion": 1,
-  "ruleVersion": 1,
+  "contentVersion": 2,
+  "ruleVersion": 2,
   "width": 4,
   "height": 4,
-  "walls": [],
+  "walls": [
+    {
+      "x": 3,
+      "y": 2
+    }
+  ],
   "blocks": [
-    {"id":"A","x":2,"y":0,"width":1,"height":2,"layers":["Yellow","Red"]},
-    {"id":"B","x":2,"y":2,"width":2,"height":1,"layers":["Blue","Red"]},
-    {"id":"C","x":0,"y":3,"width":2,"height":1,"layers":["Blue","Red"]},
-    {"id":"D","x":0,"y":0,"width":1,"height":1,"layers":["Red"]}
+    {
+      "id": "A",
+      "x": 2,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Red"
+      ],
+      "moveAxis": "X",
+      "keyId": "K1"
+    },
+    {
+      "id": "B",
+      "x": 0,
+      "y": 1,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Blue",
+        "Yellow"
+      ],
+      "moveAxis": "Y",
+      "keyId": ""
+    },
+    {
+      "id": "C",
+      "x": 1,
+      "y": 3,
+      "width": 2,
+      "height": 1,
+      "layers": [
+        "Yellow",
+        "Red"
+      ],
+      "moveAxis": "Free",
+      "keyId": "K2"
+    },
+    {
+      "id": "D",
+      "x": 1,
+      "y": 2,
+      "width": 2,
+      "height": 1,
+      "layers": [
+        "Yellow",
+        "Red"
+      ],
+      "moveAxis": "Free",
+      "keyId": ""
+    },
+    {
+      "id": "E",
+      "x": 1,
+      "y": 1,
+      "width": 1,
+      "height": 1,
+      "layers": [
+        "Red",
+        "Blue"
+      ],
+      "moveAxis": "Free",
+      "keyId": ""
+    }
   ],
   "gates": [
-    {"id":"R","side":"Left","start":1,"length":3,"color":"Red"},
-    {"id":"B","side":"Bottom","start":1,"length":3,"color":"Blue"},
-    {"id":"Y","side":"Right","start":0,"length":3,"color":"Yellow"}
+    {
+      "id": "R",
+      "side": "Left",
+      "start": 0,
+      "length": 1,
+      "color": "Red",
+      "requiredKey": "",
+      "requiredPlates": [],
+      "cycleColors": []
+    },
+    {
+      "id": "B",
+      "side": "Bottom",
+      "start": 0,
+      "length": 1,
+      "color": "Blue",
+      "requiredKey": "K2",
+      "requiredPlates": [],
+      "cycleColors": []
+    },
+    {
+      "id": "Y",
+      "side": "Right",
+      "start": 2,
+      "length": 2,
+      "color": "Yellow",
+      "requiredKey": "K1",
+      "requiredPlates": [],
+      "cycleColors": []
+    },
+    {
+      "id": "T",
+      "side": "Top",
+      "start": 0,
+      "length": 1,
+      "color": "Yellow",
+      "requiredKey": "K1",
+      "requiredPlates": [],
+      "cycleColors": []
+    }
   ],
+  "plates": [],
+  "initialPhase": 0,
   "tutorialTags": []
 }

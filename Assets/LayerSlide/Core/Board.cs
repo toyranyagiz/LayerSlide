@@ -44,6 +44,42 @@ namespace LayerSlide.Core
 
         public bool IsInside(int x, int y) => x >= 0 && y >= 0 && x < Level.Width && y < Level.Height;
 
+        // Keys, plates and the gate phase are derived from positions and removed layers only (GDD 01 §13),
+        // so Undo, replay and the solver's state key restore them without extra fields.
+
+        /// <summary>A key is collected once every layer of its carrier is gone.</summary>
+        public bool HasKey(int key)
+        {
+            int carrier = Level.CarrierOf(key);
+            return carrier >= 0 && IsRemoved(carrier);
+        }
+
+        /// <summary>(initialPhase + total peeled layers) mod 2.</summary>
+        public int Phase
+        {
+            get
+            {
+                int total = Level.InitialPhase;
+                for (int b = 0; b < _removed.Length; b++) total += _removed[b];
+                return total & 1;
+            }
+        }
+
+        /// <summary>Block standing on the plate, or -1.</summary>
+        public int GetPlateHolder(int plate)
+        {
+            var spec = Level.Plates[plate];
+            int cell = _cells[spec.Y * Level.Width + spec.X];
+            return cell >= 0 ? cell : -1;
+        }
+
+        /// <summary>Held by some block other than <paramref name="actor"/>: a block cannot hold its own exit open.</summary>
+        public bool IsPlateHeld(int plate, int actor)
+        {
+            int holder = GetPlateHolder(plate);
+            return holder >= 0 && holder != actor;
+        }
+
         /// <summary>Block index, <see cref="EmptyCell"/> or <see cref="WallCell"/>. Cells outside the board read as walls.</summary>
         public int GetCell(int x, int y) => IsInside(x, y) ? _cells[y * Level.Width + x] : WallCell;
 
@@ -137,6 +173,7 @@ namespace LayerSlide.Core
 
         public void WriteTo(BoardState state)
         {
+            state.campaignVersion = RuleConstants.CampaignVersion;
             state.levelId = Level.LevelId;
             state.contentVersion = Level.ContentVersion;
             state.ruleVersion = Level.RuleVersion;
@@ -159,7 +196,9 @@ namespace LayerSlide.Core
         public bool Matches(BoardState state)
         {
             if (state == null || state.blocks == null || state.blocks.Count != _x.Length) return false;
-            if (state.levelId != Level.LevelId || state.contentVersion != Level.ContentVersion || state.ruleVersion != Level.RuleVersion)
+            if (state.campaignVersion != RuleConstants.CampaignVersion) return false;
+            if (state.levelId != Level.LevelId || state.contentVersion
+ != Level.ContentVersion || state.ruleVersion != Level.RuleVersion)
                 return false;
             if (state.moveCount != MoveCount || state.isCompleted != IsCleared) return false;
 

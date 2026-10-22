@@ -13,7 +13,11 @@ namespace LayerSlide.Presentation
     public static class MeshLibrary
     {
         public const float CornerRadius = 0.06f;
-        public const int CornerSegments = 3;
+        public const int CornerSegments = 6;
+        /// <summary>Width of the rim band around the raised inner panel of a slab's top cap.</summary>
+        const float PanelInset = 0.07f;
+
+        const int EdgeSegments = 4;
 
         static readonly Dictionary<string, Mesh> Cache = new Dictionary<string, Mesh>();
 
@@ -34,9 +38,16 @@ namespace LayerSlide.Presentation
 
         public static void ClearCache() => Cache.Clear();
 
-        /// <summary>Rectangular slab with rounded vertical corners (block layers).</summary>
-        public static Mesh RoundedSlab(float sizeX, float height, float sizeZ) =>
-            GetOrCreate($"slab{sizeX:F3}x{height:F3}x{sizeZ:F3}", () => BuildRoundedSlab(sizeX, height, sizeZ));
+        /// <summary>
+        /// Rectangular slab with rounded vertical corners of <paramref name="radius"/> and a soft rounded top edge
+        /// (block layers, board tray, cells, gates).
+        /// </summary>
+        public static Mesh RoundedSlab(float sizeX, float height, float sizeZ, float radius = CornerRadius) =>
+            GetOrCreate($"slab2_{sizeX:F3}x{height:F3}x{sizeZ:F3}r{radius:F3}", () => BuildRoundedSlab(sizeX, height, sizeZ, radius));
+
+        /// <summary>Flat textured quad facing +Y with UVs 0..1 (blob shadows).</summary>
+        public static Mesh Quad(float sizeX, float sizeZ) =>
+            GetOrCreate($"quad{sizeX:F3}x{sizeZ:F3}", () => BuildQuad(sizeX, sizeZ));
 
         public static Mesh Box(float sizeX, float height, float sizeZ) =>
             GetOrCreate($"box{sizeX:F3}x{height:F3}x{sizeZ:F3}", () => BuildBox(sizeX, height, sizeZ));
@@ -58,6 +69,27 @@ namespace LayerSlide.Presentation
         public static Mesh Symbol(LayerColor color, float diameter) =>
             GetOrCreate($"symbol{color}{diameter:F3}", () => BuildSymbol(color, diameter * 0.5f));
 
+        /// <summary>F1 rail marker: two opposed chevrons along Z, <paramref name="offset"/> from the center (GDD 04 §13).</summary>
+        public static Mesh RailArrows(float offset, float length, float width) =>
+            GetOrCreate($"rail{offset:F3}x{length:F3}x{width:F3}", () => BuildRailArrows(offset, length, width));
+
+        /// <summary>Flat key glyph (bow on the left, bit on the right) fitting a <paramref name="size"/> square.</summary>
+        public static Mesh KeyGlyph(float size) =>
+            GetOrCreate($"key{size:F3}", () => BuildKeyGlyph(size));
+
+        /// <summary>Flat padlock glyph; an open lock lifts and shifts its shackle.</summary>
+        public static Mesh LockGlyph(float size, bool open) =>
+            GetOrCreate($"lock{size:F3}{(open ? "o" : "c")}", () => BuildLockGlyph(size, open));
+
+        /// <summary>Flat ring (plate outline when empty).</summary>
+        public static Mesh Ring(float outerRadius, float innerRadius) =>
+            GetOrCreate($"ring{outerRadius:F3}x{innerRadius:F3}", () =>
+            {
+                var builder = new MeshBuilder();
+                AddRing(builder, Vector3.zero, outerRadius, innerRadius, 32, 0f, 360f);
+                return builder.ToMesh();
+            });
+
         /// <summary>Keys are formatted with the invariant culture so baked keys match on every device locale.</summary>
         static Mesh GetOrCreate(System.FormattableString keyFormat, System.Func<Mesh> build)
         {
@@ -69,14 +101,28 @@ namespace LayerSlide.Presentation
             return mesh;
         }
 
+        static Mesh BuildQuad(float sizeX, float sizeZ)
+        {
+            float x = sizeX * 0.5f, z = sizeZ * 0.5f;
+            var mesh = new Mesh();
+            mesh.SetVertices(new List<Vector3> { new Vector3(-x, 0, -z), new Vector3(-x, 0, z), new Vector3(x, 0, z), new Vector3(x, 0, -z) });
+            mesh.SetNormals(new List<Vector3> { Vector3.up, Vector3.up, Vector3.up, Vector3.up });
+            mesh.SetUVs(0, new List<Vector2> { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) });
+            mesh.SetTriangles(new[] { 0, 1, 2, 0, 2, 3 }, 0);
+            mesh.RecalculateBounds();
+            mesh.UploadMeshData(!KeepReadable);
+            return mesh;
+        }
+
         /// <summary>
-        /// Slab whose vertical corners and top edges are rounded with the same 0.06 radius in 3 segments.
+        /// Slab whose vertical corners are rounded with <paramref name="radius"/> and whose top edge is rounded
+        /// with up to the same radius (at most 45% of the height), so it reads as soft molded plastic.
         /// The bottom is open: it always rests on the board or another layer.
         /// </summary>
-        static Mesh BuildRoundedSlab(float sizeX, float height, float sizeZ)
+        static Mesh BuildRoundedSlab(float sizeX, float height, float sizeZ, float radius)
         {
-            float r = Mathf.Min(CornerRadius, Mathf.Min(sizeX, sizeZ) * 0.5f);
-            float edge = Mathf.Min(CornerRadius, height * 0.5f);
+            float r = Mathf.Min(radius, Mathf.Min(sizeX, sizeZ) * 0.5f);
+            float edge = Mathf.Min(r, height * 0.45f);
             float cx = sizeX * 0.5f - r, cz = sizeZ * 0.5f - r;
             Vector2[] corners = { new Vector2(cx, cz), new Vector2(-cx, cz), new Vector2(-cx, -cz), new Vector2(cx, -cz) };
 
@@ -93,9 +139,9 @@ namespace LayerSlide.Presentation
 
             // Ring k is the outline inset by `inset` at height `y`; its normals tilt from sideways (0) to up (90 deg).
             var rings = new List<(float y, float inset, float tilt)> { (0f, 0f, 0f), (height - edge, 0f, 0f) };
-            for (int k = 1; k <= CornerSegments; k++)
+            for (int k = 1; k <= EdgeSegments; k++)
             {
-                float theta = k * 90f / CornerSegments * Mathf.Deg2Rad;
+                float theta = k * 90f / EdgeSegments * Mathf.Deg2Rad;
                 rings.Add((height - edge + edge * Mathf.Sin(theta), edge * (1f - Mathf.Cos(theta)), theta));
             }
 
@@ -113,10 +159,20 @@ namespace LayerSlide.Presentation
                     Normal(ring, i), Normal(ring + 1, i), Normal(ring + 1, next), Normal(ring, next));
             }
 
+            // Flat cap: a rim band, then the raised-looking inner panel (UV1.y = 1) the toy shader lightens.
             int top = rings.Count - 1;
+            float panelInset = Mathf.Min(PanelInset, Mathf.Min(sizeX, sizeZ) * 0.2f);
+            Vector3 Inner(int i) =>
+                cornerCenters[i] + radials[i] * Mathf.Max(0f, r - rings[top].inset - panelInset) + Vector3.up * height;
+            for (int i = 0; i < count; i++)
+            {
+                int next = (i + 1) % count;
+                builder.AddQuad(Point(top, i), Inner(i), Inner(next), Point(top, next),
+                    Vector3.up, Vector3.up, Vector3.up, Vector3.up, 0f, 1f, 1f, 0f);
+            }
             var center = Vector3.up * height;
             for (int i = 0; i < count; i++)
-                builder.AddTriangle(center, Point(top, i), Point(top, (i + 1) % count), Vector3.up);
+                builder.AddTriangle(center, Inner(i), Inner((i + 1) % count), Vector3.up, Vector3.up, Vector3.up, 1f, 1f, 1f);
             return builder.ToMesh();
         }
 
@@ -211,6 +267,55 @@ namespace LayerSlide.Presentation
             return builder.ToMesh();
         }
 
+        static Mesh BuildRailArrows(float offset, float length, float width)
+        {
+            var builder = new MeshBuilder();
+            foreach (float sign in new[] { 1f, -1f })
+            {
+                float tip = sign * (offset + length), baseZ = sign * offset;
+                builder.AddTriangle(new Vector3(0f, 0f, tip), new Vector3(width * 0.5f, 0f, baseZ), new Vector3(-width * 0.5f, 0f, baseZ), Vector3.up);
+            }
+            float shaft = width * 0.3f;
+            AddFlatRect(builder, -shaft * 0.5f, shaft * 0.5f, -offset, offset);
+            return builder.ToMesh();
+        }
+
+        static Mesh BuildKeyGlyph(float size)
+        {
+            float s = size;
+            var builder = new MeshBuilder();
+            AddRing(builder, new Vector3(-0.26f * s, 0f, 0f), 0.22f * s, 0.10f * s, 20, 0f, 360f);
+            AddFlatRect(builder, -0.06f * s, 0.46f * s, -0.055f * s, 0.055f * s);
+            AddFlatRect(builder, 0.30f * s, 0.40f * s, -0.24f * s, -0.055f * s);
+            AddFlatRect(builder, 0.14f * s, 0.23f * s, -0.18f * s, -0.055f * s);
+            return builder.ToMesh();
+        }
+
+        static Mesh BuildLockGlyph(float size, bool open)
+        {
+            float s = size;
+            var builder = new MeshBuilder();
+            AddFlatRect(builder, -0.34f * s, 0.34f * s, -0.42f * s, 0.06f * s);
+            float lift = open ? 0.14f * s : 0f, shift = open ? 0.18f * s : 0f;
+            var center = new Vector3(shift, 0f, 0.10f * s + lift);
+            AddRing(builder, center, 0.24f * s, 0.13f * s, 16, 0f, 180f);
+            AddFlatRect(builder, shift - 0.24f * s, shift - 0.13f * s, 0.06f * s, center.z);
+            if (!open) AddFlatRect(builder, 0.13f * s, 0.24f * s, 0.06f * s, center.z);
+            return builder.ToMesh();
+        }
+
+        /// <summary>Flat annulus sector from <paramref name="fromDeg"/> to <paramref name="toDeg"/> (degrees, counter-clockwise from +X toward +Z).</summary>
+        static void AddRing(MeshBuilder builder, Vector3 center, float outer, float inner, int segments, float fromDeg, float toDeg)
+        {
+            float from = fromDeg * Mathf.Deg2Rad, step = (toDeg - fromDeg) * Mathf.Deg2Rad / segments;
+            for (int i = 0; i < segments; i++)
+            {
+                var d0 = new Vector3(Mathf.Cos(from + i * step), 0f, Mathf.Sin(from + i * step));
+                var d1 = new Vector3(Mathf.Cos(from + (i + 1) * step), 0f, Mathf.Sin(from + (i + 1) * step));
+                builder.AddQuad(center + d0 * inner, center + d0 * outer, center + d1 * outer, center + d1 * inner, Vector3.up);
+            }
+        }
+
         static void AddFlatRect(MeshBuilder builder, float minX, float maxX, float minZ, float maxZ) =>
             builder.AddQuad(new Vector3(minX, 0, minZ), new Vector3(minX, 0, maxZ), new Vector3(maxX, 0, maxZ), new Vector3(maxX, 0, minZ), Vector3.up);
 
@@ -220,30 +325,41 @@ namespace LayerSlide.Presentation
             readonly List<Vector3> _vertices = new List<Vector3>();
             readonly List<Vector3> _normals = new List<Vector3>();
             readonly List<int> _triangles = new List<int>();
+            // UV1.y: toy shader "inner panel" weight (0 everywhere except raised cap panels).
+            readonly List<Vector2> _panel = new List<Vector2>();
 
             public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 normal) =>
                 AddTriangle(a, b, c, normal, normal, normal);
 
-            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc)
+            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc) =>
+                AddTriangle(a, b, c, na, nb, nc, 0f, 0f, 0f);
+
+            public void AddTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc, float pa, float pb, float pc)
             {
                 if (Vector3.Dot(Vector3.Cross(b - a, c - a), na + nb + nc) < 0f)
                 {
                     (b, c) = (c, b);
                     (nb, nc) = (nc, nb);
+                    (pb, pc) = (pc, pb);
                 }
                 int start = _vertices.Count;
                 _vertices.Add(a); _vertices.Add(b); _vertices.Add(c);
                 _normals.Add(na); _normals.Add(nb); _normals.Add(nc);
+                _panel.Add(new Vector2(0f, pa)); _panel.Add(new Vector2(0f, pb)); _panel.Add(new Vector2(0f, pc));
                 _triangles.Add(start); _triangles.Add(start + 1); _triangles.Add(start + 2);
             }
 
             public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal) =>
                 AddQuad(a, b, c, d, normal, normal, normal, normal);
 
-            public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 na, Vector3 nb, Vector3 nc, Vector3 nd)
+            public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 na, Vector3 nb, Vector3 nc, Vector3 nd) =>
+                AddQuad(a, b, c, d, na, nb, nc, nd, 0f, 0f, 0f, 0f);
+
+            public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 na, Vector3 nb, Vector3 nc, Vector3 nd,
+                float pa, float pb, float pc, float pd)
             {
-                AddTriangle(a, b, c, na, nb, nc);
-                AddTriangle(a, c, d, na, nc, nd);
+                AddTriangle(a, b, c, na, nb, nc, pa, pb, pc);
+                AddTriangle(a, c, d, na, nc, nd, pa, pc, pd);
             }
 
             public Mesh ToMesh()
@@ -251,6 +367,7 @@ namespace LayerSlide.Presentation
                 var mesh = new Mesh();
                 mesh.SetVertices(_vertices);
                 mesh.SetNormals(_normals);
+                mesh.SetUVs(1, _panel);
                 mesh.SetTriangles(_triangles, 0);
                 mesh.RecalculateBounds();
                 mesh.UploadMeshData(!KeepReadable);

@@ -10,19 +10,33 @@ namespace LayerSlide.Presentation
     /// </summary>
     public sealed class BoardPresenter : MonoBehaviour
     {
-        const float TileSize = 0.96f;
-        const float TileThickness = 0.04f;
-        const float WallHeight = 0.24f;
-        const float PerimeterThickness = 0.12f;
-        const float PerimeterHeight = 0.20f;
+        const float TileSize = 0.94f;
+        const float TileThickness = 0.06f;
+        const float TileRadius = 0.14f;
+        const float WellMargin = 0.06f;
+        const float WellTop = -0.035f;
+        const float WallHeight = 0.26f;
+        const float WallRadius = 0.16f;
+        const float TrayMargin = 0.44f;
+        const float TrayHeight = 0.30f;
+        const float TrayRadius = 0.40f;
+        const float BaseOverhang = 0.10f;
+        const float PerimeterThickness = 0.18f;
+        const float PerimeterHeight = 0.18f;
+
+        const float PerimeterRadius = 0.08f;
         const float FrameThickness = 0.03f;
         const float FrameY = 0.005f;
         const float FlashDuration = 0.12f;
         const float FootprintInset = 0.08f;
+        const float PlateSize = 0.80f;
+        const float PlateThickness = 0.02f;
+        const float PlateTop = 0.012f;
 
         [SerializeField] VisualTheme theme;
 
-        Transform _tilesRoot, _wallsRoot, _gatesRoot, _blocksRoot, _fxRoot;
+        Transform _tilesRoot, _wallsRoot, _platesRoot, _gatesRoot, _blocksRoot, _fxRoot;
+        readonly List<(GameObject empty, GameObject pressed)> _plates = new List<(GameObject, GameObject)>();
         readonly List<BlockView> _blocks = new List<BlockView>();
         readonly List<GateView> _gates = new List<GateView>();
         readonly List<(Vector3 min, Vector3 max)> _wallBounds = new List<(Vector3, Vector3)>();
@@ -59,6 +73,7 @@ namespace LayerSlide.Presentation
             MeshLibrary.Register(theme.meshBank);
             _tilesRoot = CreateRoot("TilesRoot");
             _wallsRoot = CreateRoot("WallsRoot");
+            _platesRoot = CreateRoot("PlatesRoot");
             _gatesRoot = CreateRoot("GatesRoot");
             _blocksRoot = CreateRoot("BlocksRoot");
             _fxRoot = CreateRoot("FxRoot");
@@ -102,6 +117,8 @@ namespace LayerSlide.Presentation
             _level = level;
             ClearChildren(_tilesRoot);
             ClearChildren(_wallsRoot);
+            ClearChildren(_platesRoot);
+            _plates.Clear();
             ClearChildren(_gatesRoot);
             ClearChildren(_blocksRoot);
             _blocks.Clear();
@@ -114,9 +131,11 @@ namespace LayerSlide.Presentation
             _armedGate = -1;
             _burstAt = -1f;
 
-            var tileMesh = MeshLibrary.Box(TileSize, TileThickness, TileSize);
-            var wallMesh = MeshLibrary.Box(TileSize, WallHeight, TileSize);
-            var crossMesh = MeshLibrary.Cross(0.3f, 0.05f);
+            BuildTray(level);
+
+            var tileMesh = MeshLibrary.RoundedSlab(TileSize, TileThickness, TileSize, TileRadius);
+            var wallMesh = MeshLibrary.RoundedSlab(TileSize, WallHeight, TileSize, WallRadius);
+            var crossMesh = MeshLibrary.Cross(0.3f, 0.06f);
 
             for (int y = 0; y < level.Height; y++)
             for (int x = 0; x < level.Width; x++)
@@ -125,26 +144,29 @@ namespace LayerSlide.Presentation
                 {
                     var wall = BlockView.CreateRenderer($"Wall_{x}_{y}", _wallsRoot, wallMesh, theme.wall, true);
                     var center = CellCenter(x, y);
-                    wall.transform.localPosition = center;
-                    BlockView.CreateRenderer("Cross", wall.transform, crossMesh, theme.dark, false).transform.localPosition = new Vector3(0f, WallHeight + 0.004f, 0f);
+                    wall.transform.localPosition = center + Vector3.up * WellTop; // rests on the well floor, not floating over the gap
+                    BlockView.CreateRenderer("Cross", wall.transform, crossMesh, theme.white, false).transform.localPosition = new Vector3(0f, WallHeight + 0.004f, 0f);
                     _wallBounds.Add((center - new Vector3(0.48f, 0f, 0.48f), center + new Vector3(0.48f, WallHeight, 0.48f)));
                 }
                 else
                 {
-                    var tile = BlockView.CreateRenderer($"Tile_{x}_{y}", _tilesRoot, tileMesh, theme.board, false);
+                    // Two-tone checkerboard so rows and columns read at a glance.
+                    var cellMaterial = (x + y) % 2 == 1 && theme.boardCellAlt != null ? theme.boardCellAlt : theme.boardCell;
+                    var tile = BlockView.CreateRenderer($"Tile_{x}_{y}", _tilesRoot, tileMesh, cellMaterial != null ? cellMaterial : theme.board, false);
                     tile.transform.localPosition = CellCenter(x, y) + Vector3.down * TileThickness;
                     tile.GetComponent<MeshRenderer>().receiveShadows = true;
                 }
             }
 
             BuildPerimeter(level);
+            BuildPlates(level);
 
             foreach (var spec in level.Gates)
             {
                 var view = new GameObject().AddComponent<GateView>();
                 view.transform.SetParent(_gatesRoot, false);
-                view.Initialize(spec, theme);
-                view.transform.localPosition = GateCenter(level, spec);
+                view.Initialize(spec, theme, level);
+                view.transform.localPosition = GateCenter(level, spec) + Vector3.down * GateView.SurfaceHeight;
                 view.SetSymbolVisible(showSymbols);
                 _gates.Add(view);
             }
@@ -154,7 +176,7 @@ namespace LayerSlide.Presentation
             {
                 var view = new GameObject().AddComponent<BlockView>();
                 view.transform.SetParent(_blocksRoot, false);
-                view.Initialize(spec, theme);
+                view.Initialize(spec, theme, spec.CarriesKey ? level.Keys[spec.Key] : null);
                 view.SetSymbolsVisible(showSymbols);
                 _blocks.Add(view);
             }
@@ -178,7 +200,52 @@ namespace LayerSlide.Presentation
             _selectionFrame.gameObject.SetActive(false);
             _armedGate = -1;
             _burstAt = -1f;
+            ApplyMechanics(board);
         }
+
+        /// <summary>
+        /// Shows the derived key / plate / phase state of the committed model. Called after every commit, Undo
+        /// and sync; previews never call it, so dragging never opens a gate visually (GDD 01 §12 F3).
+        /// </summary>
+        public void ApplyMechanics(Board board)
+        {
+            foreach (var gate in _gates)
+                gate.ApplyState(board);
+            for (int p = 0; p < _plates.Count; p++)
+            {
+                bool held = board.GetPlateHolder(p) >= 0;
+                _plates[p].empty.SetActive(!held);
+                _plates[p].pressed.SetActive(held);
+            }
+        }
+
+        /// <summary>F3 plates: a thin floor piece with its id; the outline turns into a white fill while held.</summary>
+        void BuildPlates(Level level)
+        {
+            var baseMesh = MeshLibrary.RoundedSlab(PlateSize, PlateThickness, PlateSize, 0.12f);
+            foreach (var spec in level.Plates)
+            {
+                var plate = BlockView.CreateRenderer("Plate_" + spec.Id, _platesRoot, baseMesh, theme.wall, false);
+                plate.transform.localPosition = CellCenter(spec.X, spec.Y) + Vector3.up * (PlateTop - PlateThickness);
+                plate.GetComponent<MeshRenderer>().receiveShadows = true;
+
+                var empty = new GameObject("Empty");
+                empty.transform.SetParent(plate.transform, false);
+                empty.transform.localPosition = new Vector3(0f, PlateThickness + 0.002f, 0f);
+                BlockView.CreateRenderer("Ring", empty.transform, MeshLibrary.Frame(PlateSize - 0.12f, PlateSize - 0.12f, 0.05f), theme.white, false);
+                WorldLabel.Create(empty.transform, spec.Id, 0.16f, theme, Color.white).transform.localPosition = new Vector3(0f, 0.002f, 0f);
+
+                var pressed = BlockView.CreateRenderer("Pressed", plate.transform,
+                    MeshLibrary.RoundedSlab(PlateSize - 0.06f, 0.004f, PlateSize - 0.06f, 0.10f), theme.white, false);
+                pressed.transform.localPosition = new Vector3(0f, PlateThickness, 0f);
+                pressed.SetActive(false);
+                _plates.Add((empty, pressed));
+            }
+        }
+
+        /// <summary>Forbidden rail axis feedback (F1).</summary>
+        public void FlashRail(int block) => _blocks[block].FlashRail();
+
 
         public void SetSymbolsVisible(bool visible)
         {
@@ -186,16 +253,41 @@ namespace LayerSlide.Presentation
             foreach (var gate in _gates) gate.SetSymbolVisible(visible);
         }
 
+        /// <summary>
+        /// White rounded tray under the cells, gates and rim, resting on a slightly larger lavender base so the
+        /// board reads as one chunky toy piece.
+        /// </summary>
+        void BuildTray(Level level)
+        {
+            float width = level.Width + 2f * TrayMargin, depth = level.Height + 2f * TrayMargin;
+            var tray = BlockView.CreateRenderer("Tray", _tilesRoot, MeshLibrary.RoundedSlab(width, TrayHeight, depth, TrayRadius), theme.board, false);
+            tray.transform.localPosition = new Vector3(0f, -TileThickness - TrayHeight, 0f);
+            tray.GetComponent<MeshRenderer>().receiveShadows = true;
+
+            var trayBase = BlockView.CreateRenderer("TrayBase", _tilesRoot,
+                MeshLibrary.RoundedSlab(width + 2f * BaseOverhang, TrayHeight, depth + 2f * BaseOverhang, TrayRadius + BaseOverhang), theme.wall, false);
+            trayBase.transform.localPosition = new Vector3(0f, -TileThickness - TrayHeight - 0.12f, 0f);
+
+            // Recessed floor under the cells: the narrow gaps between tiles show it as soft grooves.
+            if (theme.boardWell != null)
+            {
+                float wellHeight = WellTop + TileThickness;
+                var well = BlockView.CreateRenderer("Well", _tilesRoot,
+                    MeshLibrary.RoundedSlab(level.Width + 2f * WellMargin, wellHeight, level.Height + 2f * WellMargin, 0.16f), theme.boardWell, false);
+                well.transform.localPosition = new Vector3(0f, -TileThickness, 0f);
+                well.GetComponent<MeshRenderer>().receiveShadows = true;
+            }
+        }
+
         void BuildPerimeter(Level level)
         {
-            var mesh = MeshLibrary.Box(1f, PerimeterHeight, 1f);
             float t = PerimeterThickness;
             foreach (GateSide side in new[] { GateSide.Left, GateSide.Right, GateSide.Bottom, GateSide.Top })
             {
                 bool vertical = side.GetAxis() == Axis.X;
-                // Bottom/Top segments also cover the corners.
-                float from = vertical ? 0f : -t;
-                float to = vertical ? level.Height : level.Width + t;
+                // Every side runs into the corners so the rounded ends overlap into one continuous rim.
+                float from = -t;
+                float to = (vertical ? level.Height : level.Width) + t;
 
                 var openings = new List<(float start, float end)>();
                 foreach (var gate in level.Gates)
@@ -206,14 +298,15 @@ namespace LayerSlide.Presentation
                 float cursor = from;
                 foreach (var (start, end) in openings)
                 {
-                    AddPerimeterSegment(level, mesh, side, cursor, start);
+                    AddPerimeterSegment(level, side, cursor, start);
                     cursor = end;
                 }
-                AddPerimeterSegment(level, mesh, side, cursor, to);
+                AddPerimeterSegment(level, side, cursor, to);
             }
         }
 
-        void AddPerimeterSegment(Level level, Mesh mesh, GateSide side, float from, float to)
+        /// <summary>Chunky rounded rim piece resting on the tray, outside the cell area; gates cut it.</summary>
+        void AddPerimeterSegment(Level level, GateSide side, float from, float to)
         {
             if (to - from < 0.001f) return;
 
@@ -230,11 +323,12 @@ namespace LayerSlide.Presentation
                 default: center = new Vector3(along - level.Width * 0.5f, 0f, level.Height * 0.5f + t * 0.5f); break;
             }
 
+            var size = vertical ? new Vector3(t, PerimeterHeight, length) : new Vector3(length, PerimeterHeight, t);
+            var mesh = MeshLibrary.RoundedSlab(size.x, PerimeterHeight, size.z, Mathf.Min(PerimeterRadius, length * 0.5f));
+            center.y = -TileThickness;
             var segment = BlockView.CreateRenderer("Perimeter", _wallsRoot, mesh, theme.perimeter, true);
             segment.transform.localPosition = center;
-            segment.transform.localScale = vertical ? new Vector3(t, 1f, length) : new Vector3(length, 1f, t);
-
-            var size = vertical ? new Vector3(t, PerimeterHeight, length) : new Vector3(length, PerimeterHeight, t);
+            segment.GetComponent<MeshRenderer>().receiveShadows = true;
             _wallBounds.Add((center - new Vector3(size.x * 0.5f, 0f, size.z * 0.5f), center + new Vector3(size.x * 0.5f, size.y, size.z * 0.5f)));
         }
 
@@ -250,7 +344,9 @@ namespace LayerSlide.Presentation
                 var divider = BlockView.CreateRenderer("GateDivider", _gatesRoot, mesh, theme.dark, false);
                 var gateCenter = GateCenter(level, a);
                 float boundary = a.End - (vertical ? level.Height : level.Width) * 0.5f;
-                divider.transform.localPosition = vertical ? new Vector3(gateCenter.x, 0f, boundary) : new Vector3(boundary, 0f, gateCenter.z);
+                divider.transform.localPosition = vertical ? new Vector3(gateCenter.x, -GateView.SurfaceHeight, boundary)
+                    : new Vector3(boundary, -GateView.SurfaceHeight, gateCenter.z);
+
                 divider.transform.localScale = vertical ? new Vector3(GateView.Depth, 1f, 0.02f) : new Vector3(0.02f, 1f, GateView.Depth);
             }
         }
@@ -480,7 +576,7 @@ namespace LayerSlide.Presentation
         public void PlayWin(int seed, bool reducedMotion)
         {
             if (!reducedMotion)
-                _fx.Confetti(Vector3.up * 0.4f, 20, seed);
+                _fx.Confetti(Vector3.up * 0.4f, 48, seed);
         }
 
         // ---------------------------------------------------------------- Hint
@@ -559,7 +655,7 @@ namespace LayerSlide.Presentation
             if (_burstAt > 0f && Time.time >= _burstAt)
             {
                 _burstAt = -1f;
-                _fx.Burst(_burstPosition, _burstColor, 8, _burstSeed);
+                _fx.Burst(_burstPosition, _burstColor, 12, _burstSeed);
             }
 
             if (_selectionFlashUntil > 0f && Time.unscaledTime >= _selectionFlashUntil)

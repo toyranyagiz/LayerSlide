@@ -28,7 +28,7 @@ namespace LayerSlide.Core
         {
             int x = board.GetX(block), y = board.GetY(block);
             min = max = axis == Axis.X ? x : y;
-            if (board.IsRemoved(block)) return;
+            if (board.IsRemoved(block) || !board.Level.Blocks[block].AllowsAxis(axis)) return;
 
             if (axis == Axis.X)
             {
@@ -55,28 +55,68 @@ namespace LayerSlide.Core
             }
         }
 
+        /// <summary>Color the gate accepts right now; a phase gate reads it from the board phase (F4).</summary>
+        public static LayerColor GetGateColor(Board board, int gate) => board.Level.Gates[gate].ColorAt(board.Phase);
+
+        /// <summary>
+        /// Every condition of one gate for the block standing at (x, y) on the gate's edge, checked in the
+        /// order the UI reports them (GDD 04 §13): rail axis, color, key, plates (actor excluded), full fit.
+        /// The other blocks are read from the board, which holds the stable pre-command state.
+        /// </summary>
+        public static GateCheck CheckGate(Board board, int block, int x, int y, int gate)
+        {
+            var spec = board.Level.Blocks[block];
+            var g = board.Level.Gates[gate];
+            if (!spec.AllowsAxis(g.Side.GetAxis())) return GateCheck.WrongAxis;
+            if (GetGateColor(board, gate) != board.GetActiveColor(block)) return GateCheck.WrongColor;
+            if (g.IsLocked && !board.HasKey(g.RequiredKey)) return GateCheck.KeyRequired;
+            foreach (int plate in g.RequiredPlates)
+                if (!board.IsPlateHeld(plate, block))
+                    return GateCheck.PlatesRequired;
+
+            bool horizontalSide = g.Side.GetAxis() == Axis.X;
+            int from = horizontalSide ? y : x;
+            int to = from + (horizontalSide ? spec.Height : spec.Width);
+            return from >= g.Start && to <= g.End ? GateCheck.Ok : GateCheck.DoesNotFit;
+        }
+
         /// <summary>
         /// Gate on <paramref name="side"/> that accepts the block's active layer when it stands at (x, y), or -1.
-        /// Requires: block on that edge, matching color and the whole block edge inside the gate range (GDD 01 §5).
+        /// Requires the block on that edge and every gate condition met (GDD 01 §5 and §12).
         /// </summary>
-        public static int FindExitGate(Board board, int block, int x, int y, GateSide side)
+        public static int FindExitGate(Board board, int block, int x, int y, GateSide side) =>
+            DiagnoseExit(board, block, x, y, side, out int gate) == GateCheck.Ok ? gate : -1;
+
+        /// <summary>
+        /// Best result among the gates on <paramref name="side"/> that overlap the block's edge. When none accepts,
+        /// <paramref name="gate"/> is the candidate that got furthest (or -1) and the result says what is missing.
+        /// </summary>
+        public static GateCheck DiagnoseExit(Board board, int block, int x, int y, GateSide side, out int gate)
         {
-            if (board.IsRemoved(block) || !IsOnEdge(board, block, x, y, side)) return -1;
+            gate = -1;
+            if (board.IsRemoved(block) || !IsOnEdge(board, block, x, y, side)) return GateCheck.DoesNotFit;
 
             var spec = board.Level.Blocks[block];
-            var color = board.GetActiveColor(block);
+            if (!spec.AllowsAxis(side.GetAxis())) return GateCheck.WrongAxis;
+
             bool horizontalSide = side.GetAxis() == Axis.X;
             int from = horizontalSide ? y : x;
             int to = from + (horizontalSide ? spec.Height : spec.Width);
 
+            var best = GateCheck.DoesNotFit;
             var gates = board.Level.Gates;
             for (int g = 0; g < gates.Length; g++)
             {
-                var gate = gates[g];
-                if (gate.Side == side && gate.Color == color && from >= gate.Start && to <= gate.End)
-                    return g;
+                if (gates[g].Side != side || to <= gates[g].Start || from >= gates[g].End) continue;
+                var check = CheckGate(board, block, x, y, g);
+                if (gate < 0 || check > best)
+                {
+                    best = check;
+                    gate = g;
+                }
+                if (check == GateCheck.Ok) break;
             }
-            return -1;
+            return best;
         }
 
         /// <summary>

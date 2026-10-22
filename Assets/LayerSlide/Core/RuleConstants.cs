@@ -3,8 +3,12 @@ namespace LayerSlide.Core
     /// <summary>Fixed rule constants from GDD 01 (ruleVersion = 1). All distances are in cells.</summary>
     public static class RuleConstants
     {
-        public const int RuleVersion = 1;
-        public const int SchemaVersion = 1;
+        public const int RuleVersion = 2;
+        public const int SchemaVersion = 2;
+
+        /// <summary>Campaign 2 (GDD v2.0): 40 levels; part of every saved board state.</summary>
+        public const int CampaignVersion = 2;
+
 
         /// <summary>Drag distance that locks the movement axis.</summary>
         public const float AxisLockThreshold = 0.15f;

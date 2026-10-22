@@ -1,0 +1,139 @@
+{
+  "levelId": "L014",
+  "contentVersion": 2,
+  "ruleVersion": 2,
+  "actions": [
+    {
+      "block": "A",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 3,
+      "y": 2,
+      "exit": "Y"
+    },
+    {
+      "block": "D",
+      "x": 3,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 3,
+      "y": 3,
+      "exit": "Y"
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 2,
+      "y": 3,
+      "exit": "Y"
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "B",
+      "x": 2,
+      "y": 0,
+      "exit": "B"
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 1,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 3,
+      "y": 3,
+      "exit": "Y"
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 0,
+      "y": 1,
+      "exit": "R"
+    }
+  ]
+}

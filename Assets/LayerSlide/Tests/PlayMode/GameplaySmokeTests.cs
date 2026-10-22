@@ -34,7 +34,8 @@ namespace LayerSlide.Tests
         public void Cleanup() => DeleteSave();
 
         [UnityTest]
-        public IEnumerator FirstTenLevelsCanBeCompletedInOrder()
+        [Timeout(1800000)] // 40 levels, 996 commands
+        public IEnumerator AllLevelsCanBeCompletedInOrder()
         {
             SceneManager.LoadScene("Gameplay");
             GameController game = null;
@@ -51,11 +52,11 @@ namespace LayerSlide.Tests
                     Assert.AreEqual(ModalId.Won, ui.Modal.Current);
                     game.OnBackPressed(); // Won -> level list
                     Assert.AreEqual(AppScreen.LevelSelect, ui.CurrentScreen);
-                    if (levelId == "L009") yield return Capture("03_LevelSelect");
+                    if (levelId == "L031") yield return Capture("03_LevelSelect");
                     game.OnLevelSelected(levelId);
                     yield return WaitUntil(() => game.AcceptsBoardInput, 2f);
                     Assert.AreEqual(levelId, game.Board.Level.LevelId, $"{levelId} must be unlocked");
-                    if (levelId == "L009") yield return Capture("04_L009_start");
+                    if (levelId == "L031") yield return Capture("04_L031_start");
                 }
 
                 var solution = LevelCatalog.LoadSolution(levelId);
@@ -70,7 +71,7 @@ namespace LayerSlide.Tests
                     game.OnBlockPressed(block);
                     game.OnBlockReleased(block, action.x, action.y, gate);
                     Assert.AreEqual(i + 1, game.Board.MoveCount, $"{levelId} action {i + 1} was not committed");
-                    if (levelId == "L009" && i == 2) yield return Capture("05_L009_midway");
+                    if (levelId == "L031" && i == 10) yield return Capture("05_L031_midway");
                 }
 
                 yield return WaitUntil(() => ui.Modal.Current == ModalId.Won, 2f);

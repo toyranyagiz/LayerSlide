@@ -238,7 +238,7 @@ namespace LayerSlide.Core
 
         /// <summary>
         /// h = 12 x remaining layers + for each active block the Manhattan distance to the closest gate of its
-        /// active color that it fits through. Obstacles are ignored. Returns <see cref="Unsolvable"/> when an
+        /// active color that it fits through along an axis its rail allows. Obstacles, keys and plates are ignored. Returns <see cref="Unsolvable"/> when an
         /// active layer has no compatible gate at all.
         /// </summary>
         int Heuristic(ulong key)
@@ -257,7 +257,11 @@ namespace LayerSlide.Core
                 int best = Unsolvable;
                 foreach (var gate in _level.Gates)
                 {
-                    if (gate.Color != color) continue;
+                    // Keys and plates are relaxed; a phase gate counts for either of its colors.
+                    bool colorFits = gate.HasPhase
+                        ? gate.CycleColors[0] == color || gate.CycleColors[1] == color
+                        : gate.Color == color;
+                    if (!colorFits || !spec.AllowsAxis(gate.Side.GetAxis())) continue;
                     int distance = DistanceToGate(spec, x, y, gate);
                     if (distance < best) best = distance;
                 }
@@ -276,6 +280,8 @@ namespace LayerSlide.Core
 
             int along = horizontalSide ? y : x;
             int alignDistance = along < gate.Start ? gate.Start - along : along > alignMax ? along - alignMax : 0;
+            // A rail block can never shift sideways to line up with a gate on its own axis.
+            if (alignDistance > 0 && spec.MoveAxis != MoveAxis.Free) return Unsolvable;
 
             int edgeDistance;
             switch (gate.Side)

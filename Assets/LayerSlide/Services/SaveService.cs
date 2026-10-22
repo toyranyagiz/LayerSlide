@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using LayerSlide.Core;
 using UnityEngine;
 
 namespace LayerSlide.Services
@@ -18,7 +19,9 @@ namespace LayerSlide.Services
         /// <summary>Files existed but none was valid; a fresh profile was created.</summary>
         ProfileReset,
         /// <summary>The save belongs to a newer game version and must not be touched.</summary>
-        NewerVersion
+        NewerVersion,
+        /// <summary>A campaign 1 profile was moved to campaign 2: settings kept, progress archived.</summary>
+        CampaignMigrated
     }
 
     /// <summary>
@@ -27,7 +30,7 @@ namespace LayerSlide.Services
     /// </summary>
     public sealed class SaveService
     {
-        public const int SaveVersion = 2;
+        public const int SaveVersion = 3;
         public const int EnvelopeVersion = 1;
 
         readonly string _mainPath;
@@ -81,14 +84,14 @@ namespace LayerSlide.Services
             }
 
             _lastAttemptedRevision = best.revision;
-            outcome = best == backup && File.Exists(_mainPath) && main == null
-                ? SaveLoadOutcome.RecoveredFromBackup
+            bool migrated = (best == main && mainMigrated) || (best == temp && tempMigrated) || (best == backup && backupMigrated);
+            outcome = migrated ? SaveLoadOutcome.CampaignMigrated
+                : best == backup && File.Exists(_mainPath) && main == null ? SaveLoadOutcome.RecoveredFromBackup
                 : SaveLoadOutcome.Loaded;
 
-            bool migrated = (best == main && mainMigrated) || (best == temp && tempMigrated) || (best == backup && backupMigrated);
             if (migrated)
             {
-                // saveVersion 1 -> 2: converted in memory and validated; written as a new revision. The previous
+                // saveVersion 1/2 -> 3: converted in memory and validated; written as a new revision. The previous
                 // valid main is kept as save.bak by the normal write path.
                 TryWrite(best);
             }
@@ -186,8 +189,17 @@ namespace LayerSlide.Services
         static bool IsProfileValid(PlayerSave save)
         {
             if (save.saveVersion != SaveVersion || save.revision < 0) return false;
-            if (save.completedLevelIds == null || save.tutorialCompletedIds == null || save.settings == null || save.currentRun == null)
+            if (save.campaignVersion != RuleConstants.CampaignVersion) return false;
+            if (save.completedLevelIds == null || save.tutorialCompletedIds == null || save.settings == null || save.currentRun == null
+                || save.legacyCampaign1CompletedLevelIds == null)
                 return false;
+
+            // Campaign 1 archive: unique ids of the old L001–L030 range only.
+            var legacy = new HashSet<string>();
+            foreach (var id in save.legacyCampaign1CompletedLevelIds)
+                if (!IsCampaign1Id(id) || !legacy.Add(id))
+                    return false;
+
 
             // Completed levels must be unique, known, and contiguous from the first level.
             var seen = new HashSet<string>();
@@ -208,7 +220,11 @@ namespace LayerSlide.Services
                 && settings.lastNonZeroSfxVolume >= 1 && settings.lastNonZeroSfxVolume <= 100;
         }
 
+        static bool IsCampaign1Id(string id) =>
+            id != null && id.Length == 4 && id[0] == 'L' && int.TryParse(id.Substring(1), out int number) && number >= 1 && number <= 30;
+
         static string Sha256Hex(string text)
+
         {
             using (var sha = SHA256.Create())
             {

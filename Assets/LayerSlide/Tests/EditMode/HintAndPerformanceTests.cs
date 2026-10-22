@@ -162,9 +162,27 @@ namespace LayerSlide.Tests
             Assert.IsTrue(LevelCatalog.TryLoadLevel("L004", out var level, out _));
             var board = new Board(level);
             var history = new CommandHistory();
+
+            // Shuttle the first block that can slide at the start between its start cell and a neighbour.
+            int block = -1, startX = 0, startY = 0, otherX = 0, otherY = 0;
+            for (int b = 0; b < level.Blocks.Length && block < 0; b++)
+            foreach (var axis in new[] { Axis.X, Axis.Y })
+            {
+                RuleEngine.GetSlideRange(board, b, axis, out int min, out int max);
+                if (min == max) continue;
+                block = b;
+                startX = otherX = board.GetX(b);
+                startY = otherY = board.GetY(b);
+                int start = axis == Axis.X ? startX : startY, target = start < max ? start + 1 : start - 1;
+                if (axis == Axis.X) otherX = target; else otherY = target;
+                break;
+            }
+            Assert.GreaterOrEqual(block, 0);
+
             for (int i = 0; i < 10000; i++)
             {
-                Assert.IsTrue(RuleEngine.TryCreateCommand(board, 0, i % 2 == 0 ? 2 : 1, 1, -1, out var command));
+                bool outbound = i % 2 == 0;
+                Assert.IsTrue(RuleEngine.TryCreateCommand(board, block, outbound ? otherX : startX, outbound ? otherY : startY, -1, out var command));
                 RuleEngine.Apply(board, command);
                 history.Push(command);
             }
@@ -194,7 +212,9 @@ namespace LayerSlide.Tests
                 Assert.IsTrue(restoredBoard.Matches(loaded.currentRun.boardState));
 
                 while (restored.Count > 0) RuleEngine.Revert(restoredBoard, restored.Pop());
-                Assert.AreEqual(1, restoredBoard.GetX(0));
+                Assert.AreEqual(startX, restoredBoard.GetX(block));
+                Assert.AreEqual(startY, restoredBoard.GetY(block));
+
                 Assert.AreEqual(0, restoredBoard.MoveCount);
 
                 UnityEngine.Debug.Log($"[F07] write {write.ElapsedMilliseconds} ms, load+replay {load.ElapsedMilliseconds} ms");

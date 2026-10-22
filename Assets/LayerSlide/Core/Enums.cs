@@ -22,6 +22,28 @@ namespace LayerSlide.Core
         Y
     }
 
+    /// <summary>F1 rails: Free moves on both axes, X / Y only along that axis (GDD 01 §12).</summary>
+    public enum MoveAxis : byte
+    {
+        Free,
+        X,
+        Y
+    }
+
+    /// <summary>
+    /// Why a gate refuses a block. Declared in the order the UI reports problems (GDD 04 §13):
+    /// the first failing check wins, so a larger value means more conditions were already met.
+    /// </summary>
+    public enum GateCheck : byte
+    {
+        WrongAxis,
+        WrongColor,
+        KeyRequired,
+        PlatesRequired,
+        DoesNotFit,
+        Ok
+    }
+
     public static class GateSideExtensions
     {
         public static Axis GetAxis(this GateSide side) =>

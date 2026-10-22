@@ -20,11 +20,12 @@ namespace LayerSlide.Core
             if (def.contentVersion < 1) errors.Add("contentVersion must be >= 1.");
             if (def.width < 4 || def.width > 5 || def.height < 4 || def.height > 5)
                 errors.Add($"Board size {def.width}x{def.height} is outside 4..5.");
-            if (def.walls == null || def.blocks == null || def.gates == null || def.tutorialTags == null)
+            if (def.walls == null || def.blocks == null || def.gates == null || def.tutorialTags == null || def.plates == null)
             {
-                errors.Add("walls, blocks, gates and tutorialTags must all be present.");
+                errors.Add("walls, blocks, gates, plates and tutorialTags must all be present.");
                 return false;
             }
+            if (def.initialPhase != 0 && def.initialPhase != 1) errors.Add($"initialPhase {def.initialPhase} must be 0 or 1.");
             if (errors.Count > startCount)
                 return false;
 
@@ -43,6 +44,7 @@ namespace LayerSlide.Core
             if (def.blocks.Count > RuleConstants.MaxBlocks) errors.Add($"Level has more than {RuleConstants.MaxBlocks} blocks.");
 
             var blockIds = new HashSet<string>();
+            var keyIds = new HashSet<string>();
             foreach (var block in def.blocks)
             {
                 if (string.IsNullOrEmpty(block.id) || !blockIds.Add(block.id))
@@ -54,6 +56,10 @@ namespace LayerSlide.Core
                 if (!validShape) { errors.Add($"Block {block.id} has invalid footprint {block.width}x{block.height}."); continue; }
 
                 ValidateLayers(block, errors);
+                if (!Level.TryParseAxis(block.moveAxis, out _))
+                    errors.Add($"Block {block.id} has unknown moveAxis '{block.moveAxis}'.");
+                if (!string.IsNullOrEmpty(block.keyId) && !keyIds.Add(block.keyId))
+                    errors.Add($"Key {block.keyId} has more than one carrier.");
 
                 for (int dy = 0; dy < block.height; dy++)
                 for (int dx = 0; dx < block.width; dx++)
@@ -66,10 +72,62 @@ namespace LayerSlide.Core
                 }
             }
 
+            var plateIds = ValidatePlates(def, occupied, errors);
             ValidateGates(def, errors);
+            ValidateGateMechanics(def, keyIds, plateIds, errors);
             ValidateGateCoverage(def, errors);
 
             return errors.Count == startCount;
+        }
+
+        /// <summary>Plates sit on free floor cells, start empty and never touch each other (GDD 01 §12 F3).</summary>
+        static HashSet<string> ValidatePlates(LevelDefinition def, string[] occupied, List<string> errors)
+        {
+            var ids = new HashSet<string>();
+            int w = def.width, h = def.height;
+            for (int i = 0; i < def.plates.Count; i++)
+            {
+                var plate = def.plates[i];
+                if (string.IsNullOrEmpty(plate.id) || !ids.Add(plate.id))
+                    errors.Add($"Plate id '{plate.id}' is empty or duplicated.");
+                if (!InBoard(plate.x, plate.y, w, h)) { errors.Add($"Plate {plate.id} is outside the board."); continue; }
+                var cell = occupied[plate.y * w + plate.x];
+                if (cell != null) errors.Add($"Plate {plate.id} starts under {cell}.");
+
+                for (int j = 0; j < i; j++)
+                {
+                    var other = def.plates[j];
+                    if (System.Math.Abs(other.x - plate.x) + System.Math.Abs(other.y - plate.y) < 2)
+                        errors.Add($"Plates {other.id} and {plate.id} are closer than 2 cells.");
+                }
+            }
+            return ids;
+        }
+
+        static void ValidateGateMechanics(LevelDefinition def, HashSet<string> keyIds, HashSet<string> plateIds, List<string> errors)
+        {
+            foreach (var gate in def.gates)
+            {
+                if (gate.requiredPlates == null || gate.cycleColors == null)
+                {
+                    errors.Add($"Gate {gate.id} must list requiredPlates and cycleColors.");
+                    continue;
+                }
+                if (!string.IsNullOrEmpty(gate.requiredKey) && !keyIds.Contains(gate.requiredKey))
+                    errors.Add($"Gate {gate.id} requires key {gate.requiredKey} that no block carries.");
+                foreach (var plate in gate.requiredPlates)
+                    if (!plateIds.Contains(plate))
+                        errors.Add($"Gate {gate.id} requires unknown plate {plate}.");
+
+                if (gate.cycleColors.Count == 0) continue;
+                if (gate.cycleColors.Count != 2 || gate.cycleColors[0] == gate.cycleColors[1])
+                    errors.Add($"Gate {gate.id} cycleColors must be two different colors.");
+                else if (gate.color != gate.cycleColors[0])
+                    errors.Add($"Gate {gate.id} color must equal cycleColors[0].");
+                foreach (var color in gate.cycleColors)
+                    if (!Level.TryParseColor(color, out _))
+                        errors.Add($"Gate {gate.id} has unknown cycle color '{color}'.");
+            }
         }
 
         static void ValidateLayers(BlockDefinition block, List<string> errors)
@@ -118,18 +176,20 @@ namespace LayerSlide.Core
             }
         }
 
-        /// <summary>Every layer color must have at least one gate the block's footprint fits through.</summary>
+        /// <summary>Every layer color must have at least one gate the block fits through along an axis its rail allows.</summary>
         static void ValidateGateCoverage(LevelDefinition def, List<string> errors)
         {
             foreach (var block in def.blocks)
             {
-                if (block.layers == null) continue;
+                if (block.layers == null || !Level.TryParseAxis(block.moveAxis, out var rail)) continue;
                 foreach (var color in block.layers)
                 {
                     bool found = false;
                     foreach (var gate in def.gates)
                     {
-                        if (gate.color != color || !Level.TryParseSide(gate.side, out var side)) continue;
+                        bool colorFits = gate.color == color || (gate.cycleColors != null && gate.cycleColors.Contains(color));
+                        if (!colorFits || !Level.TryParseSide(gate.side, out var side)) continue;
+                        if (rail != MoveAxis.Free && (rail == MoveAxis.X) != (side.GetAxis() == Axis.X)) continue;
                         int span = side.GetAxis() == Axis.X ? block.height : block.width;
                         if (gate.length >= span) { found = true; break; }
                     }

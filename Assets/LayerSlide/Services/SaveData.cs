@@ -4,7 +4,7 @@ using LayerSlide.Core;
 
 namespace LayerSlide.Services
 {
-    // Player save DTOs (GDD 06 §4, saveVersion = 2). Field names are the file format.
+    // Player save DTOs (GDD 06 §4, saveVersion = 3). Field names are the file format.
 
     [Serializable]
     public class RunSave
@@ -35,7 +35,11 @@ namespace LayerSlide.Services
     public class PlayerSave
     {
         public int saveVersion = SaveService.SaveVersion;
+        public int campaignVersion = RuleConstants.CampaignVersion;
+        /// <summary>Levels completed in campaign 1 (archived by the v3 migration); never unlocks anything.</summary>
+        public List<string> legacyCampaign1CompletedLevelIds = new List<string>();
         public long revision;
+
         public List<string> completedLevelIds = new List<string>();
         public List<string> tutorialCompletedIds = new List<string>();
         public RunSave currentRun = new RunSave();

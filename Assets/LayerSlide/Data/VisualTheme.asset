@@ -16,11 +16,19 @@ MonoBehaviour:
   blue: {fileID: 2100000, guid: a679051ca5fcb264ca9fd963ff9aebb1, type: 2}
   yellow: {fileID: 2100000, guid: 74d2687cafd0c304fb45e15cd893b703, type: 2}
   board: {fileID: 2100000, guid: 007185d50b8d0544bb726fcdd88e9ce4, type: 2}
+  boardCell: {fileID: 2100000, guid: 63178e3d5a6c9ea4eb4c2e4783becdee, type: 2}
+  boardCellAlt: {fileID: 2100000, guid: 889cf61c13a47104e97673702f89903b, type: 2}
+  boardWell: {fileID: 2100000, guid: 659a4893aa08826488674ad1ec393bc7, type: 2}
   wall: {fileID: 2100000, guid: 2fa3d5d5c4b436f4f9e1c87065c51cf8, type: 2}
   perimeter: {fileID: 2100000, guid: c97730775f52471448b40b85193090ac, type: 2}
   white: {fileID: 2100000, guid: bd441f7cc1e31254bb9a1f0453b382e1, type: 2}
   dark: {fileID: 2100000, guid: 282df4d05c8be474eb692f4b6057159a, type: 2}
   whiteTransparent: {fileID: 2100000, guid: 083ffa4b4e848374395ee4362003a2f2, type: 2}
+  background: {fileID: 2100000, guid: 6de372f51a50c8842bd504eab7f183b1, type: 2}
+  blobShadow: {fileID: 2100000, guid: 17bc51d63e1f06843a7f075e0dcc2277, type: 2}
+  gloss: {fileID: 2100000, guid: 576d14c36146b174e8289c6678fdd733, type: 2}
   meshBank: {fileID: 11400000, guid: 4b530e209d78aab4986fd90b6ea2479b, type: 2}
-  regularFont: {fileID: 11400000, guid: fa1a78957d7be6046bfd13c570e32c22, type: 2}
-  semiBoldFont: {fileID: 11400000, guid: 4480e3ddf07569743b76f6f94cbf4090, type: 2}
+  bodyFont: {fileID: 11400000, guid: 4bde01d47872f124cbf3c063c847f1c4, type: 2}
+  displayFont: {fileID: 11400000, guid: fd471af1e6b23c24f9637546c234235d, type: 2}
+  titleTextMaterial: {fileID: 2100000, guid: b34ec58849dcbce4ab310c12b920d78a, type: 2}
+  buttonTextMaterial: {fileID: 2100000, guid: 356a0b0fc25998a4d9bbac85adb6f744, type: 2}

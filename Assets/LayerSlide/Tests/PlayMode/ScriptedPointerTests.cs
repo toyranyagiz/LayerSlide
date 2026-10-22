@@ -116,7 +116,8 @@ namespace LayerSlide.Tests
         }
 
         [UnityTest]
-        public IEnumerator AllTenLevelsCanBeSolvedThroughTheInputController()
+        [Timeout(3600000)] // 996 real drags
+        public IEnumerator AllLevelsCanBeSolvedThroughTheInputController()
         {
             SceneManager.LoadScene("Gameplay");
             yield return WaitFor(() => (_game = Object.FindFirstObjectByType<GameController>()) != null && _game.Board != null && _game.AcceptsBoardInput);

@@ -1,0 +1,163 @@
+{
+  "levelId": "L026",
+  "contentVersion": 2,
+  "ruleVersion": 2,
+  "actions": [
+    {
+      "block": "D",
+      "x": 0,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "A",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 4,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 4,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 4,
+      "y": 3,
+      "exit": "Y"
+    },
+    {
+      "block": "C",
+      "x": 4,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "C",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "E",
+      "x": 4,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 1,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 2,
+      "y": 3,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 1,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "B",
+      "x": 4,
+      "y": 0,
+      "exit": "B"
+    },
+    {
+      "block": "B",
+      "x": 4,
+      "y": 4,
+      "exit": "T"
+    },
+    {
+      "block": "D",
+      "x": 4,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 4,
+      "y": 3,
+      "exit": "T"
+    },
+    {
+      "block": "D",
+      "x": 4,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 2,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 2,
+      "y": 2,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 0,
+      "exit": ""
+    },
+    {
+      "block": "D",
+      "x": 0,
+      "y": 2,
+      "exit": "R"
+    },
+    {
+      "block": "E",
+      "x": 0,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 4,
+      "y": 1,
+      "exit": ""
+    },
+    {
+      "block": "E",
+      "x": 4,
+      "y": 3,
+      "exit": "T"
+    }
+  ]
+}

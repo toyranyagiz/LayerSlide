@@ -15,16 +15,17 @@ namespace LayerSlide.Tests
         public static LevelDefinition Definition(int size, BlockDefinition[] blocks, GateDefinition[] gates, params CellData[] walls) =>
             new LevelDefinition
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
                 levelId = "T000",
                 contentVersion = 1,
-                ruleVersion = 1,
+                ruleVersion = 2,
                 width = size,
                 height = size,
                 walls = new List<CellData>(walls),
                 blocks = new List<BlockDefinition>(blocks),
                 gates = new List<GateDefinition>(gates),
-                tutorialTags = new List<string>()
+                tutorialTags = new List<string>(),
+                plates = new List<PlateDefinition>()
             };
 
         public static Board Board(int size, BlockDefinition[] blocks, GateDefinition[] gates, params CellData[] walls) =>

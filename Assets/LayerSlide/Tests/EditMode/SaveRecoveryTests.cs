@@ -98,7 +98,7 @@ namespace LayerSlide.Tests
         }
 
         [Test]
-        public void S12_Version1IsMigratedAndTheOldFileKept()
+        public void S12_Version1IsMigratedToCampaign2AndTheOldFileKept()
         {
             // saveVersion 1: run stored as "BoardState", settings without lastNonZero/colorSymbols, no attempt data.
             const string v1 = "{\"saveVersion\":1,\"revision\":7,\"completedLevelIds\":[\"L001\",\"L002\"]," +
@@ -108,17 +108,21 @@ namespace LayerSlide.Tests
             WriteEnvelope("save.json", v1);
 
             var loaded = new SaveService(_directory).Load(out var outcome);
-            Assert.AreEqual(SaveLoadOutcome.Loaded, outcome);
+            Assert.AreEqual(SaveLoadOutcome.CampaignMigrated, outcome);
             Assert.AreEqual(SaveService.SaveVersion, loaded.saveVersion);
+            Assert.AreEqual(2, loaded.campaignVersion);
             Assert.AreEqual(8, loaded.revision, "migration is written as a new revision");
-            Assert.AreEqual(40, loaded.settings.sfxVolume);
+            Assert.AreEqual(40, loaded.settings.sfxVolume, "settings survive");
             Assert.AreEqual(40, loaded.settings.lastNonZeroSfxVolume);
             Assert.IsTrue(loaded.settings.vibration);
             Assert.IsTrue(loaded.settings.colorSymbols, "missing settings get their defaults");
-            Assert.AreEqual("L003", loaded.currentRun.boardState.levelId);
-            Assert.AreEqual(32, loaded.currentRun.attemptId.Length);
-            Assert.AreEqual(0, loaded.currentRun.undoCount);
-            Assert.IsTrue(loaded.isFirstLaunchCompleted);
+
+            // GDD 05 §12: old progress is archived, never counted for the new layouts.
+            CollectionAssert.AreEqual(new[] { "L001", "L002" }, loaded.legacyCampaign1CompletedLevelIds);
+            CollectionAssert.IsEmpty(loaded.completedLevelIds);
+            CollectionAssert.IsEmpty(loaded.tutorialCompletedIds);
+            Assert.IsFalse(loaded.HasRun, "the campaign 1 run is dropped");
+            Assert.IsFalse(loaded.isFirstLaunchCompleted, "the new campaign opens at L001");
 
             StringAssert.Contains("\\\"saveVersion\\\":1", File.ReadAllText(PathOf("save.bak")), "the v1 file is kept as backup");
             var reloaded = new SaveService(_directory).Load(out _);
@@ -133,6 +137,8 @@ namespace LayerSlide.Tests
         [TestCase("unknown-level")]
         [TestCase("gap-in-completed")]
         [TestCase("volume-out-of-range")]
+        [TestCase("old-campaign")]
+        [TestCase("legacy-new-id")]
         public void X09_InvalidPayloadIsRejectedEvenWithACorrectHash(string variant)
         {
             string valid = ValidPayload();
@@ -146,6 +152,9 @@ namespace LayerSlide.Tests
                 case "unknown-level": payload = valid.Replace("[\"L001\"]", "[\"L999\"]"); break;
                 case "gap-in-completed": payload = valid.Replace("[\"L001\"]", "[\"L002\"]"); break;
                 case "volume-out-of-range": payload = valid.Replace("\"sfxVolume\":70", "\"sfxVolume\":170"); break;
+                case "old-campaign": payload = valid.Replace("\"campaignVersion\":2,", "\"campaignVersion\":1,"); break;
+                case "legacy-new-id": payload = valid.Replace("\"legacyCampaign1CompletedLevelIds\":[]", "\"legacyCampaign1CompletedLevelIds\":[\"L031\"]"); break;
+
                 default: payload = variant; break;
             }
             Assert.AreNotEqual(valid, payload, "the variant must change the payload");
