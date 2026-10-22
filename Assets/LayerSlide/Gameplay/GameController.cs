@@ -86,6 +86,10 @@ namespace LayerSlide.Gameplay
         Level _sequenceLevel;
         int _remainingCacheKey = -1;
         string _remainingCacheText;
+        bool _tutorialShownLogged;
+
+        /// <summary>Raised once per won run, in the same step that records the completion.</summary>
+        public event Action<string> LevelCompleted;
 
         public Board Board => _board;
         public bool ReducedMotion => _profile != null && _profile.settings.reducedMotion;
@@ -202,6 +206,8 @@ namespace LayerSlide.Gameplay
                 ShowLoadError(levelId, resume);
                 return;
             }
+            if (_level != null && _board != null && !_board.IsCleared && _history.Count > 0 && !(resume && _level.LevelId == levelId))
+                Log("level_left");
 
             _level = level;
             _board = new Board(level);
@@ -233,6 +239,8 @@ namespace LayerSlide.Gameplay
             SyncRunToProfile();
             Save();
             SetState(PlayState.Idle);
+            _tutorialShownLogged = false;
+            Log("level_started", ("attemptId", _profile.currentRun.attemptId), ("resumed", resumed));
         }
 
         RunSave NewRun() => new RunSave
@@ -337,6 +345,23 @@ namespace LayerSlide.Gameplay
         {
             presenter.FlashInvalidExit(block, side, x, y);
             _audio.Play(Sfx.Blocked);
+            Log("invalid_exit_attempt", ("reason", InvalidExitReason(block, side, x, y)));
+        }
+
+        /// <summary>"wrong_color", "partial_cover" (a gate is there but does not accept the block) or "no_gate".</summary>
+        string InvalidExitReason(int block, GateSide side, int x, int y)
+        {
+            var spec = _level.Blocks[block];
+            bool vertical = side.GetAxis() == Axis.X;
+            int from = vertical ? y : x, to = from + (vertical ? spec.Height : spec.Width);
+            string reason = "no_gate";
+            foreach (var gate in _level.Gates)
+            {
+                if (gate.Side != side || to <= gate.Start || from >= gate.End) continue;
+                if (gate.Color != _board.GetActiveColor(block)) reason = "wrong_color";
+                else return "partial_cover";
+            }
+            return reason;
         }
 
         public void OnGateArmed() => _audio.Play(Sfx.GateReady);
@@ -360,16 +385,33 @@ namespace LayerSlide.Gameplay
             if (completedTag != null) AddUnique(_profile.tutorialCompletedIds, completedTag);
 
             bool won = _board.IsCleared;
+            string wonTag = null;
             if (won)
             {
                 AddUnique(_profile.completedLevelIds, _level.LevelId);
-                string openTag = _tutorial.OnLevelWon();
-                if (openTag != null) AddUnique(_profile.tutorialCompletedIds, openTag);
+                wonTag = _tutorial.OnLevelWon();
+                if (wonTag != null) AddUnique(_profile.tutorialCompletedIds, wonTag);
             }
 
             // Progress, board, history and tutorial are written together, once, before any animation.
             SyncRunToProfile();
             Save();
+
+            var axis = RuleEngine.GetCommandAxis(_level, command);
+            int distance = Mathf.Abs(command.visualEndX - command.beforeX) + Mathf.Abs(command.visualEndY - command.beforeY);
+            Log("move_committed", ("blockId", command.blockId), ("axis", axis == Axis.X ? "X" : "Y"), ("distance", distance), ("peeled", command.IsPeel));
+            if (command.IsPeel)
+            {
+                int peeledBlock = _level.IndexOfBlock(command.blockId);
+                Log("layer_peeled", ("gateId", command.gateId), ("remainingLayers", _board.GetRemainingLayers(peeledBlock)), ("blockRemoved", _board.IsRemoved(peeledBlock)));
+            }
+            if (completedTag != null) Log("tutorial_completed", ("tag", completedTag));
+            if (wonTag != null) Log("tutorial_completed", ("tag", wonTag));
+            if (won)
+            {
+                Log("level_completed", ("moves", _board.MoveCount), ("undoCount", _profile.currentRun.undoCount));
+                LevelCompleted?.Invoke(_level.LevelId);
+            }
 
             presenter.AnimateCommand(command, ReducedMotion, _history.Count);
             int block = _level.IndexOfBlock(command.blockId);
@@ -408,6 +450,7 @@ namespace LayerSlide.Gameplay
             presenter.AnimateUndo(command, ReducedMotion);
             presenter.HideHint();
             _audio.Play(Sfx.Undo);
+            Log("undo_used", ("historyDepth", _history.Count));
             EnterTimedState(PlayState.Settling, ReducedMotion ? 0f : SettleSeconds, PlayState.Idle);
         }
 
@@ -428,6 +471,7 @@ namespace LayerSlide.Gameplay
             SyncRunToProfile();
             Save();
             SetState(PlayState.Idle);
+            Log("level_restarted", ("attemptId", _profile.currentRun.attemptId));
         }
 
         // ================================================================ State machine
@@ -461,6 +505,7 @@ namespace LayerSlide.Gameplay
 
         void EnterWon()
         {
+            if (_state == PlayState.Won) return; // a repeated timer/focus callback must not win twice
             SetState(PlayState.Won);
             presenter.HideHint();
             presenter.HideTutorialHand();
@@ -531,6 +576,11 @@ namespace LayerSlide.Gameplay
             {
                 _shownMessage = message;
                 ui.Hud.SetMessage(message ?? string.Empty);
+                if (!_tutorialShownLogged && message != null && _tutorial.ActiveTag != null)
+                {
+                    _tutorialShownLogged = true;
+                    Log("tutorial_shown", ("tag", _tutorial.ActiveTag));
+                }
             }
         }
 
@@ -618,6 +668,7 @@ namespace LayerSlide.Gameplay
 
             _statusMessage = null;
             SetState(PlayState.Idle);
+            Log("hint_result", ("status", result.Status.ToString()), ("expanded", result.Expanded), ("cpuMs", result.CpuMilliseconds));
             switch (result.Status)
             {
                 case HintStatus.Found:
@@ -627,7 +678,7 @@ namespace LayerSlide.Gameplay
                         ShowStatus("İpucu şu anda kullanılamıyor. Yeniden dene.", MessageSeconds);
                         return;
                     }
-                    presenter.ShowHint(action, _board);
+                    presenter.ShowHint(action, _board, ReducedMotion);
                     _hintVisibleUntil = Time.unscaledTime + HintSeconds;
                     _focusBlock = action.Block;
                     break;
@@ -664,6 +715,8 @@ namespace LayerSlide.Gameplay
         /// <summary>Leaving the board keeps the run as it is; only the screen changes.</summary>
         void LeavePlaying()
         {
+            if (ui.CurrentScreen == AppScreen.Playing && _board != null && !_board.IsCleared && _history.Count > 0)
+                Log("level_left");
             input.CancelActiveDrag();
             _hints.Cancel();
             ui.Modal.Hide();
@@ -787,6 +840,22 @@ namespace LayerSlide.Gameplay
         {
             presenter.gameObject.SetActive(visible);
             boardCamera.Camera.enabled = visible;
+        }
+
+        // ================================================================ Local test log (development builds only)
+
+        void Log(string eventName, params (string, object)[] fields)
+        {
+            if (!LocalTestLogger.Enabled || _level == null) return;
+            var run = _profile.currentRun;
+            LocalTestLogger.Log(eventName, new LocalTestLogger.Context
+            {
+                LevelId = _level.LevelId,
+                ContentVersion = _level.ContentVersion,
+                RuleVersion = _level.RuleVersion,
+                AttemptId = run.attemptId,
+                ActiveMilliseconds = run.activeMilliseconds + (long)(_activeSecondsCarry * 1000f)
+            }, fields);
         }
 
         // ================================================================ Progress

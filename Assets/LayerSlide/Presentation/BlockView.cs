@@ -40,6 +40,7 @@ namespace LayerSlide.Presentation
         float _peelTime, _peelDuration;
         bool _peelReduced;
         bool _hideWhenPeeled;
+        bool _peelSettleStarted;
 
         public int BlockIndex { get; private set; }
         public BlockSpec Spec => _spec;
@@ -155,6 +156,7 @@ namespace LayerSlide.Presentation
             _peelDuration = duration;
             _peelReduced = reducedMotion;
             _hideWhenPeeled = lastLayer;
+            _peelSettleStarted = false;
         }
 
         void Update()
@@ -189,12 +191,18 @@ namespace LayerSlide.Presentation
             }
             else
             {
-                // 240 ms outward slide; the last 80 ms of it also shrink the shell to zero (GDD 04 §8).
-                const float slide = 0.24f, shrink = 0.08f;
+                // 240 ms outward slide whose last 80 ms also shrink the shell to zero, then a 60 ms settle that
+                // only lowers the selection lift; the remaining layer never drops (GDD 04 §8, §12).
+                const float slide = 0.24f, shrink = 0.08f, settle = 0.06f;
                 float t = Mathf.Clamp01(_peelTime / slide);
                 root.localPosition = Vector3.Lerp(_peelFrom, _peelTo, Ease.OutCubic(t));
                 float shrinkT = Mathf.Clamp01((_peelTime - (slide - shrink)) / shrink);
                 root.localScale = Vector3.one * (1f - shrinkT);
+                if (!_peelSettleStarted && _peelTime >= slide)
+                {
+                    _peelSettleStarted = true;
+                    SetLift(false, settle);
+                }
             }
 
             if (_peelTime < _peelDuration) return;

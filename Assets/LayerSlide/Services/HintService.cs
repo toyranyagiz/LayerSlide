@@ -21,13 +21,18 @@ namespace LayerSlide.Services
         public readonly SolverAction Action;
         public readonly int StateRevision;
         public readonly int RunGeneration;
+        /// <summary>Nodes expanded by this search (0 when answered from a cache).</summary>
+        public readonly int Expanded;
+        public readonly double CpuMilliseconds;
 
-        public HintResult(HintStatus status, SolverAction action, int stateRevision, int runGeneration)
+        public HintResult(HintStatus status, SolverAction action, int stateRevision, int runGeneration, int expanded = 0, double cpuMilliseconds = 0)
         {
             Status = status;
             Action = action;
             StateRevision = stateRevision;
             RunGeneration = runGeneration;
+            Expanded = expanded;
+            CpuMilliseconds = cpuMilliseconds;
         }
     }
 
@@ -110,7 +115,13 @@ namespace LayerSlide.Services
             Finish(HintStatus.Cancelled, default, cache: false);
         }
 
-        void Update()
+        /// <summary>Entries in the runtime LRU cache (at most 128).</summary>
+        internal int CacheCount => _cache.Count;
+
+        void Update() => Tick();
+
+        /// <summary>Runs one 2 ms search slice and checks the budget. Called every frame.</summary>
+        internal void Tick()
         {
             if (!IsSearching) return;
 
@@ -150,12 +161,14 @@ namespace LayerSlide.Services
             var callback = _callback;
             _callback = null;
             _wallClock.Stop();
+            int expanded = _solver.ExpandedNodes;
+            double cpu = _solver.CpuTicks * 1000.0 / Stopwatch.Frequency;
             _solver.Clear();
 
             if (cache)
                 AddToCache(new CacheEntry { Key = _activeKey, Status = status, Action = action });
 
-            callback?.Invoke(new HintResult(status, action, _revision, _generation));
+            callback?.Invoke(new HintResult(status, action, _revision, _generation, expanded, cpu));
         }
 
         bool TryGetKnownAnswer(Board board, out CacheEntry entry)

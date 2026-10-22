@@ -34,6 +34,8 @@ namespace LayerSlide.Presentation
         MeshRenderer _hintBlockFrame, _hintTargetFrame, _hintArrow;
         GameObject _tutorialHand;
         int _hintGate = -1;
+        float _hintShownAt;
+        bool _hintPulse;
         int _armedGate = -1;
         float _selectionFlashUntil = -1f;
 
@@ -54,6 +56,7 @@ namespace LayerSlide.Presentation
 
         void Awake()
         {
+            MeshLibrary.Register(theme.meshBank);
             _tilesRoot = CreateRoot("TilesRoot");
             _wallsRoot = CreateRoot("WallsRoot");
             _gatesRoot = CreateRoot("GatesRoot");
@@ -70,14 +73,17 @@ namespace LayerSlide.Presentation
             _hintRoot = new GameObject("Hint");
             _hintRoot.transform.SetParent(_fxRoot, false);
             _hintBlockFrame = BlockView.CreateRenderer("BlockFrame", _hintRoot.transform, MeshLibrary.Frame(1f, 1f, 0.05f), theme.white, false).GetComponent<MeshRenderer>();
-            _hintTargetFrame = BlockView.CreateRenderer("TargetFrame", _hintRoot.transform, MeshLibrary.Frame(1f, 1f, 0.03f), theme.white, false).GetComponent<MeshRenderer>();
+            _hintTargetFrame = BlockView.CreateRenderer("TargetFrame", _hintRoot.transform, MeshLibrary.Frame(1f, 1f, 0.03f), theme.whiteTransparent, false).GetComponent<MeshRenderer>();
             _hintArrow = BlockView.CreateRenderer("Arrow", _hintRoot.transform, MeshLibrary.Arrow(1f), theme.white, false).GetComponent<MeshRenderer>();
             _hintRoot.SetActive(false);
 
+            // Pointing hand: dark silhouette under a slightly smaller white one reads as an outlined hand.
             _tutorialHand = new GameObject("TutorialHand");
             _tutorialHand.transform.SetParent(_fxRoot, false);
-            BlockView.CreateRenderer("Outline", _tutorialHand.transform, MeshLibrary.Symbol(LayerColor.Red, 0.34f), theme.dark, false);
-            BlockView.CreateRenderer("Fill", _tutorialHand.transform, MeshLibrary.Symbol(LayerColor.Red, 0.28f), theme.white, false)
+            _tutorialHand.transform.localRotation = Quaternion.Euler(0f, -90f, 0f); // fingertip points toward the left gate
+            BlockView.CreateRenderer("Outline", _tutorialHand.transform, MeshLibrary.Hand(1.12f), theme.dark, false)
+                .transform.localPosition = new Vector3(0f, 0f, 0.02f);
+            BlockView.CreateRenderer("Fill", _tutorialHand.transform, MeshLibrary.Hand(1f), theme.white, false)
                 .transform.localPosition = new Vector3(0f, 0.002f, 0f);
             _tutorialHand.SetActive(false);
         }
@@ -446,7 +452,7 @@ namespace LayerSlide.Presentation
             bool lastLayer = command.afterRemoved >= spec.LayerCount;
             float duration = reducedMotion ? 0.1f : 0.3f;
             view.PlayPeel(command.beforeRemoved, Outward(gate.Side), duration, reducedMotion, lastLayer);
-            view.SetLift(false, reducedMotion ? 0f : duration);
+            if (reducedMotion) view.SetLift(false, 0f);
 
             if (lastLayer && !reducedMotion)
             {
@@ -479,8 +485,10 @@ namespace LayerSlide.Presentation
 
         // ---------------------------------------------------------------- Hint
 
-        public void ShowHint(SolverAction action, Board board)
+        public void ShowHint(SolverAction action, Board board, bool reducedMotion)
         {
+            _hintShownAt = Time.unscaledTime;
+            _hintPulse = !reducedMotion;
             var spec = _level.Blocks[action.Block];
             var start = BlockCenter(action.Block, board.GetX(action.Block), board.GetY(action.Block));
             var target = BlockCenter(action.Block, action.X, action.Y);
@@ -518,7 +526,11 @@ namespace LayerSlide.Presentation
 
         public void HideHint()
         {
-            if (_hintRoot != null) _hintRoot.SetActive(false);
+            if (_hintRoot != null)
+            {
+                _hintRoot.SetActive(false);
+                _hintRoot.transform.localScale = Vector3.one;
+            }
             if (_hintGate >= 0 && _hintGate < _gates.Count) _gates[_hintGate].SetHighlighted(false);
             _hintGate = -1;
         }
@@ -555,6 +567,14 @@ namespace LayerSlide.Presentation
                 _selectionFlashUntil = -1f;
                 _selectionFrame.sharedMaterial = theme.white;
                 _selectionFrame.gameObject.SetActive(false);
+            }
+
+            if (_hintPulse && _hintRoot.activeSelf)
+            {
+                // Gentle 2 Hz pulse of the arrow and frames; reduced motion keeps them static (GDD 04 §8).
+                float pulse = 1f + 0.06f * Mathf.Sin((Time.unscaledTime - _hintShownAt) * Mathf.PI * 4f);
+                _hintArrow.transform.localScale = new Vector3(pulse, 1f, 1f);
+                _hintBlockFrame.transform.localScale = new Vector3(pulse, 1f, pulse);
             }
 
             if (_handTime >= 0f)

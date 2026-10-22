@@ -4,6 +4,10 @@
     "references": [
         "LayerSlide.Core",
         "LayerSlide.Runtime",
+        "Unity.InputSystem",
+        "Unity.InputSystem.TestFramework",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

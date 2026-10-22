@@ -42,6 +42,8 @@ namespace LayerSlide.Editor
             ImportTmpEssentials();
             ConfigureEditorAndPlayer();
             var pipeline = CreateRenderPipeline();
+            AssetBaker.BakeAudio();
+            AssetBaker.BakeIconAndSplash();
             CreateTheme();
             // Persist generated assets first: opening a new scene unloads unsaved in-memory assets.
             AssetDatabase.SaveAssets();
@@ -212,6 +214,8 @@ namespace LayerSlide.Editor
             theme.perimeter = LitMaterial("Perimeter", new Color(0.79f, 0.83f, 0.87f), 0.10f);
             theme.white = UnlitMaterial("UnlitWhite", Color.white);
             theme.dark = UnlitMaterial("UnlitDark", Palette.Text);
+            theme.whiteTransparent = TransparentUnlitMaterial("UnlitWhiteTransparent", new Color(1f, 1f, 1f, 0.55f));
+            theme.meshBank = AssetBaker.BakeMeshes();
             theme.regularFont = FontAsset("NotoSans-Regular");
             theme.semiBoldFont = FontAsset("NotoSans-SemiBold");
             EditorUtility.SetDirty(theme);
@@ -233,6 +237,25 @@ namespace LayerSlide.Editor
             var material = LoadOrCreateMaterial(name, "Universal Render Pipeline/Unlit");
             material.SetColor("_BaseColor", color);
             material.enableInstancing = true;
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        /// <summary>URP Unlit set to alpha-blended transparent (no depth write, transparent queue).</summary>
+        static Material TransparentUnlitMaterial(string name, Color color)
+        {
+            var material = LoadOrCreateMaterial(name, "Universal Render Pipeline/Unlit");
+            material.SetColor("_BaseColor", color);
+            material.SetFloat("_Surface", 1f);
+            material.SetFloat("_Blend", 0f);
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            material.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.renderQueue = (int)RenderQueue.Transparent;
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -274,6 +297,7 @@ namespace LayerSlide.Editor
 
         // ---------------------------------------------------------------- Scenes
 
+        /// <summary>Bootstrap shows the in-app splash (icon + name) while Gameplay loads.</summary>
         static void CreateBootstrapScene()
         {
             EnsureFolder(ScenesFolder);
@@ -284,6 +308,32 @@ namespace LayerSlide.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Palette.Environment;
             camera.cullingMask = 0;
+
+            var canvasObject = new GameObject("Splash", typeof(RectTransform));
+            canvasObject.layer = LayerMask.NameToLayer("UI");
+            canvasObject.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(360f, 640f);
+            scaler.matchWidthOrHeight = 0f;
+
+            var icon = new GameObject("Icon", typeof(RectTransform)).AddComponent<Image>();
+            icon.transform.SetParent(canvasObject.transform, false);
+            icon.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetBaker.IconPath);
+            icon.rectTransform.sizeDelta = new Vector2(160f, 160f);
+            icon.rectTransform.anchoredPosition = new Vector2(0f, 40f);
+
+            var theme = AssetDatabase.LoadAssetAtPath<VisualTheme>(ThemePath);
+            var title = new GameObject("Title", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
+            title.transform.SetParent(canvasObject.transform, false);
+            title.font = theme.semiBoldFont;
+            title.fontSize = 32f;
+            title.alignment = TextAlignmentOptions.Center;
+            title.color = Color.white;
+            title.text = "Layer Slide";
+            title.rectTransform.sizeDelta = new Vector2(320f, 48f);
+            title.rectTransform.anchoredPosition = new Vector2(0f, -80f);
+
             EditorSceneManager.SaveScene(scene, BootstrapScenePath);
         }
 
@@ -314,6 +364,7 @@ namespace LayerSlide.Editor
             background.depth = -10;
             background.orthographic = true;
             background.gameObject.AddComponent<AudioListener>();
+            background.gameObject.AddComponent<OutputLimiter>();
 
             var boardCameraObject = new GameObject("BoardCamera");
             var boardCamera = boardCameraObject.AddComponent<Camera>();
@@ -380,7 +431,7 @@ namespace LayerSlide.Editor
             else Debug.LogWarning($"[ProjectSetup] Property {name} not found on {serialized.targetObject.GetType().Name}.");
         }
 
-        static void EnsureFolder(string path)
+        public static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path)?.Replace('\\', '/');

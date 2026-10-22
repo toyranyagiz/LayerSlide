@@ -30,12 +30,6 @@ namespace LayerSlide.Services
         public const int SaveVersion = 2;
         public const int EnvelopeVersion = 1;
 
-        static readonly string[] RequiredFields =
-        {
-            "\"saveVersion\"", "\"revision\"", "\"completedLevelIds\"", "\"tutorialCompletedIds\"",
-            "\"currentRun\"", "\"settings\"", "\"isFirstLaunchCompleted\""
-        };
-
         readonly string _mainPath;
         readonly string _backupPath;
         readonly string _tempPath;
@@ -64,9 +58,9 @@ namespace LayerSlide.Services
             }
 
             // Tie-break order on equal revision is main -> tmp -> bak.
-            var main = ReadCandidate(_mainPath, out bool mainNewer);
-            var temp = ReadCandidate(_tempPath, out bool tempNewer);
-            var backup = ReadCandidate(_backupPath, out bool backupNewer);
+            var main = ReadCandidate(_mainPath, out bool mainNewer, out bool mainMigrated);
+            var temp = ReadCandidate(_tempPath, out bool tempNewer, out bool tempMigrated);
+            var backup = ReadCandidate(_backupPath, out bool backupNewer, out bool backupMigrated);
 
             if (mainNewer || tempNewer || backupNewer)
             {
@@ -91,9 +85,18 @@ namespace LayerSlide.Services
                 ? SaveLoadOutcome.RecoveredFromBackup
                 : SaveLoadOutcome.Loaded;
 
-            // Put the chosen profile back into main without bumping the revision (no new player action happened).
-            if (best != main)
+            bool migrated = (best == main && mainMigrated) || (best == temp && tempMigrated) || (best == backup && backupMigrated);
+            if (migrated)
+            {
+                // saveVersion 1 -> 2: converted in memory and validated; written as a new revision. The previous
+                // valid main is kept as save.bak by the normal write path.
+                TryWrite(best);
+            }
+            else if (best != main)
+            {
+                // Put the chosen profile back into main without bumping the revision (no new player action happened).
                 TryWriteRevision(best, best.revision);
+            }
             return best;
         }
 
@@ -120,11 +123,11 @@ namespace LayerSlide.Services
                     stream.Flush(true);
                 }
 
-                if (ReadCandidate(_tempPath, out _) == null)
+                if (ReadCandidate(_tempPath, out _, out _) == null)
                     throw new IOException("Temporary save failed verification.");
 
                 bool hasMain = File.Exists(_mainPath);
-                if (hasMain && ReadCandidate(_mainPath, out _) != null)
+                if (hasMain && ReadCandidate(_mainPath, out _, out _) != null)
                     File.Copy(_mainPath, _backupPath, true);
 
                 if (hasMain)
@@ -143,30 +146,36 @@ namespace LayerSlide.Services
             }
         }
 
-        /// <summary>Reads and fully validates one file. Returns null for anything unreadable or inconsistent.</summary>
-        static PlayerSave ReadCandidate(string path, out bool isNewerVersion)
+        /// <summary>
+        /// Reads and fully validates one file: UTF-8 JSON, envelope version, SHA-256, payload version, field types
+        /// and profile rules. Returns null for anything unreadable or inconsistent.
+        /// </summary>
+        static PlayerSave ReadCandidate(string path, out bool isNewerVersion, out bool migrated)
         {
             isNewerVersion = false;
+            migrated = false;
             if (!File.Exists(path)) return null;
 
             try
             {
-                string text = File.ReadAllText(path, Encoding.UTF8);
-                var envelope = JsonUtility.FromJson<SaveEnvelope>(text);
-                if (envelope == null || string.IsNullOrEmpty(envelope.payloadJson)) return null;
-                if (envelope.envelopeVersion > EnvelopeVersion) { isNewerVersion = true; return null; }
-                if (envelope.envelopeVersion != EnvelopeVersion) return null;
-                if (envelope.sha256 != Sha256Hex(envelope.payloadJson)) return null;
+                string text = File.ReadAllText(path, new UTF8Encoding(false, true));
+                if (!JsonTree.TryParse(text, out var envelope) || envelope.Kind != JsonKind.Object) return null;
 
-                // JsonUtility silently defaults missing fields, so check that they are present first.
-                foreach (var field in RequiredFields)
-                    if (envelope.payloadJson.IndexOf(field, StringComparison.Ordinal) < 0)
-                        return null;
+                var version = envelope.Get("envelopeVersion");
+                var payloadNode = envelope.Get("payloadJson");
+                var hashNode = envelope.Get("sha256");
+                if (version == null || !version.IsInteger || payloadNode?.Kind != JsonKind.String || hashNode?.Kind != JsonKind.String)
+                    return null;
+                if (version.Number > EnvelopeVersion) { isNewerVersion = true; return null; }
+                if ((int)version.Number != EnvelopeVersion) return null;
 
-                var save = JsonUtility.FromJson<PlayerSave>(envelope.payloadJson);
-                if (save == null) return null;
-                if (save.saveVersion > SaveVersion) { isNewerVersion = true; return null; }
-                return IsProfileValid(save) ? save : null;
+                string payload = payloadNode.String;
+                if (hashNode.String != Sha256Hex(payload)) return null;
+                if (!JsonTree.TryParse(payload, out var root)) return null;
+
+                var save = SaveFormat.Read(root, out int saveVersion, out migrated);
+                if (saveVersion > SaveVersion) { isNewerVersion = true; return null; }
+                return save != null && IsProfileValid(save) ? save : null;
             }
             catch (Exception)
             {

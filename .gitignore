@@ -31,3 +31,9 @@ crashlytics-buildsettings.json
 /Assets/StreamingAssets/aa*
 # Local test logs (GDD 06 §10)
 events*.jsonl
+
+# Exported local test logs (raw, not versioned)
+/TestLogs/
+
+# Editor screenshots captured via Unity MCP (local review only)
+/Captures/

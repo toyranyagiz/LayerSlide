@@ -20,5 +20,7 @@ MonoBehaviour:
   perimeter: {fileID: 2100000, guid: c97730775f52471448b40b85193090ac, type: 2}
   white: {fileID: 2100000, guid: bd441f7cc1e31254bb9a1f0453b382e1, type: 2}
   dark: {fileID: 2100000, guid: 282df4d05c8be474eb692f4b6057159a, type: 2}
+  whiteTransparent: {fileID: 2100000, guid: 083ffa4b4e848374395ee4362003a2f2, type: 2}
+  meshBank: {fileID: 11400000, guid: 4b530e209d78aab4986fd90b6ea2479b, type: 2}
   regularFont: {fileID: 11400000, guid: fa1a78957d7be6046bfd13c570e32c22, type: 2}
   semiBoldFont: {fileID: 11400000, guid: 4480e3ddf07569743b76f6f94cbf4090, type: 2}

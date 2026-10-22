@@ -22,6 +22,11 @@ namespace LayerSlide.Presentation
         [Header("Unlit")]
         public Material white;
         public Material dark;
+        [Tooltip("Half-transparent white, used for the hint target cell.")]
+        public Material whiteTransparent;
+
+        [Header("Meshes")]
+        public MeshBank meshBank;
 
         [Header("Fonts")]
         public TMP_FontAsset regularFont;

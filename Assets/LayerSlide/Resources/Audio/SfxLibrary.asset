@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 863b0821af7b95b45aa9e7938e0db9e0, type: 3}
+  m_Name: SfxLibrary
+  m_EditorClassIdentifier: LayerSlide.Runtime::LayerSlide.Services.SfxLibrary
+  clips:
+  - {fileID: 8300000, guid: 1cac1c63742b09b418dc54e7e1f70a08, type: 3}
+  - {fileID: 8300000, guid: 0db0912f9a564c044b7f1a3d07a068d4, type: 3}
+  - {fileID: 8300000, guid: 3df36edbac082584fb6b8c2da813d22e, type: 3}
+  - {fileID: 8300000, guid: bb973bbb989fabd42bc0aeaf666f1f91, type: 3}
+  - {fileID: 8300000, guid: eaed84c5170556c46a1ac67e42653647, type: 3}
+  - {fileID: 8300000, guid: dc2e6d3619ab5d54b9e92dbb196b1cb6, type: 3}
+  - {fileID: 8300000, guid: 3a7083ca2a58fb1448a8684586c7d7ca, type: 3}
+  output: {fileID: -2209051145392008621, guid: bc226a1118b34ea418216332c3cffd34, type: 2}
